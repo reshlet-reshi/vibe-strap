@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / ".ignore/vibe-strap"
-EXPECTED = "vibe-strap\n"
+EXPECTED = "vibe-strap\nvibe-strap\n"
 
 if __name__ == "__main__":
     try:
