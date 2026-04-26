@@ -1,17 +1,23 @@
 set -eu
 
+# Sourced by vibe-strap.sh. The caller passes the output file as $1, and
+# this helper truncates it before defining append-only emit functions.
 if [ -z "${1-}" ]; then
     printf '%s\n' 'missing argument 1 (out file)' >&2
     exit 1
 fi
 
 out="$1"
+
+# Create the parent directory when the output path includes one.
 out_dir=${out%/*}
 if [ "$out_dir" != "$out" ]; then
     mkdir -p "$out_dir"
 fi
 
+# Ensure/trancate output file.
 : > "$out"
+
 emit_raw() {
     printf '%s' "$1" >> "$out"
 }
@@ -19,6 +25,7 @@ emit_raw() {
 emit_hex() {
     bytes=
     for byte do
+        # Convert each hex byte to an octal escape for POSIX printf %b.
         bytes="${bytes}\\$(printf '%03o' "0x$byte")"
     done
     printf '%b' "$bytes" >> "$out"
