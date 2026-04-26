@@ -2,13 +2,14 @@
 . ./emit
 
 # ELF Header:
-emit_hex 7f 45 4c 46    # e_ident[EI_MAG0..EI_MAG3]: ELF signature
+emit_hex 7f             # e_ident[EI_MAG0..EI_MAG3]: ELF signature
+emit_raw 'ELF'          # ...
 emit_hex 01             # e_ident[EI_CLASS]: ELFCLASS32
 emit_hex 01             # e_ident[EI_DATA]: ELFDATA2LSB
 emit_hex 01             # e_ident[EI_VERSION]: EV_CURRENT
 emit_hex 00             # e_ident[EI_OSABI]: ELFOSABI_SYSV
 emit_hex 00             # e_ident[EI_ABIVERSION]: 0
-emit_hex 00 00 00 00    # e_ident[EI_PAD..]: padding
+emit_hex 00 00 00 00 	# e_ident[EI_PAD..]: padding
 emit_hex 00 00 00       # ...
 emit_hex 02 00          # e_type = 2; ET_EXEC, executable file
 emit_hex 03 00          # e_machine = 3; EM_386, Intel 80386
