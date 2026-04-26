@@ -32,8 +32,8 @@ emit_hex 01 00 00 00    # p_type = 1; PT_LOAD, loadable segment.
 emit_hex 00 00 00 00    # p_offset = 0; segment starts at file offset 0.
 emit_hex 00 00 00 00    # p_vaddr = 0; relative virtual address.
 emit_hex 00 00 00 00    # p_paddr = 0; ignored for this executable.
-emit_hex 97 00 00 00    # p_filesz = 151; segment bytes in file.
-emit_hex 97 00 00 00    # p_memsz = 151; segment bytes in memory.
+emit_unpatched_size     # p_filesz = filesz; segment bytes in file.
+emit_unpatched_size     # p_memsz = filesz; segment bytes in memory.
 emit_hex 05 00 00 00    # p_flags = 5; PF_R | PF_X.
 emit_hex 00 10 00 00    # p_align = 0x1000; page alignment.
 
@@ -70,4 +70,5 @@ emit_hex b8 01 00 00 00 #   mov eax, 1          ; syscall: exit
 emit_hex 31 db          #   xor ebx, ebx        ; status: 0
 emit_hex cd 80          #   int 0x80            ; exit(0)
 
-chmod +x "$out"
+patch_sizes
+end_emit
