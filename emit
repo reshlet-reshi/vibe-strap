@@ -7,6 +7,14 @@ fi
 
 out="$1"
 : > "$out"
-emit() {
-    printf '%b' "$1" >> "$out"
+emit_raw() {
+    printf '%s' "$1" >> "$out"
+}
+
+emit_hex() {
+    bytes=
+    for byte do
+        bytes="${bytes}\\$(printf '%03o' "0x$byte")"
+    done
+    printf '%b' "$bytes" >> "$out"
 }
