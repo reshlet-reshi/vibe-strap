@@ -2,14 +2,20 @@
 . ./emit
 
 # ELF Header:
+
 #  Magic:
-#    177 105 114 106                ELF signature
-#    001                            ELFCLASS32
-#    001                            ELFDATA2LSB
-#    001                            EV_CURRENT
-#    000                            ELFOSABI_SYSV
-#    000                            ABI version
-#    000 000 000 000 000 000 000    padding
+emit '\177ELF' 			# ELF signature
+emit '\001' 			# ELFCLASS32
+emit '\001'				# ELFDATA2LSB
+emit '\001'				# EV_CURRENT
+emit '\000' 			# ELFOSABI_SYSV
+emit '\000' 			# ABI version
+emit '\000\000\000\000'	# padding
+emit '\000\000\000' 	# ...
+
+# TODO LATER make sure we dont have dupe stuff in
+# the comment below this
+
 #  Type:                              EXEC (Executable file)
 #  Machine:                           Intel 80386
 #  Version:                           0x1
@@ -23,7 +29,7 @@
 #  Size of section headers:           0 (bytes)
 #  Number of section headers:         0
 #  Section header string table index: 0
-emit '\177ELF\001\001\001\000\000\000\000\000\000\000\000\000'
+
 emit '\002\000\003\000\001\000\000\000\124\200\004\010'
 emit '\064\000\000\000\000\000\000\000\000\000\000\000'
 emit '\064\000\040\000\001\000\000\000\000\000\000\000'
