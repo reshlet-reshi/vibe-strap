@@ -3,26 +3,29 @@
 
 # ELF Header:
 emit_hex 7f             # e_ident[EI_MAG0..EI_MAG3]: ELF signature
-emit_raw 'ELF'          # ...
+emit_raw 'ELF'          #  ...
 emit_hex 01             # e_ident[EI_CLASS]: ELFCLASS32
 emit_hex 01             # e_ident[EI_DATA]: ELFDATA2LSB
 emit_hex 01             # e_ident[EI_VERSION]: EV_CURRENT
 emit_hex 00             # e_ident[EI_OSABI]: ELFOSABI_SYSV
 emit_hex 00             # e_ident[EI_ABIVERSION]: 0
 emit_hex 00 00 00 00 	# e_ident[EI_PAD..]: padding
-emit_hex 00 00 00       # ...
+emit_hex 00 00 00       #  ...
 emit_hex 03 00          # e_type = 3; ET_DYN, shared object / PIE
 emit_hex 03 00          # e_machine = 3; EM_386, Intel 80386
 emit_hex 01 00 00 00    # e_version = 1; EV_CURRENT
-
 emit_hex 54 00 00 00    # e_entry = 0x54;
                         #  relative vaddr of first code byte.
                         #  skips 52-byte ELF header + 32-byte program header.
-
-# e_phoff = 52; e_shoff = 0; e_flags = 0.
-emit_hex 34 00 00 00 00 00 00 00 00 00 00 00
-# e_ehsize = 52; e_phentsize = 32; e_phnum = 1; no section headers.
-emit_hex 34 00 20 00 01 00 00 00 00 00 00 00
+emit_hex 34 00 00 00    # e_phoff = 52; program header table offset.
+emit_hex 00 00 00 00    # e_shoff = 0; no section header table.
+emit_hex 00 00 00 00    # e_flags = 0.
+emit_hex 34 00          # e_ehsize = 52; ELF header size.
+emit_hex 20 00          # e_phentsize = 32; program header entry size.
+emit_hex 01 00          # e_phnum = 1; one program header.
+emit_hex 00 00          # e_shentsize = 0; no section headers.
+emit_hex 00 00          # e_shnum = 0; no section headers.
+emit_hex 00 00          # e_shstrndx = 0; no section name string table.
 
 # Program header: one RX PT_LOAD segment containing the whole file.
 # p_vaddr = 0; p_filesz/p_memsz = 136 bytes.
