@@ -27,10 +27,15 @@ emit_hex 00 00          # e_shentsize = 0; no section headers.
 emit_hex 00 00          # e_shnum = 0; no section headers.
 emit_hex 00 00          # e_shstrndx = 0; no section name string table.
 
-# Program header: one RX PT_LOAD segment containing the whole file.
-# p_vaddr = 0; p_filesz/p_memsz = 136 bytes.
-emit_hex 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-emit_hex 88 00 00 00 88 00 00 00 05 00 00 00 00 10 00 00
+# Program header:
+emit_hex 01 00 00 00    # p_type = 1; PT_LOAD, loadable segment.
+emit_hex 00 00 00 00    # p_offset = 0; segment starts at file offset 0.
+emit_hex 00 00 00 00    # p_vaddr = 0; relative virtual address.
+emit_hex 00 00 00 00    # p_paddr = 0; ignored for this executable.
+emit_hex 88 00 00 00    # p_filesz = 136; segment bytes in file.
+emit_hex 88 00 00 00    # p_memsz = 136; segment bytes in memory.
+emit_hex 05 00 00 00    # p_flags = 5; PF_R | PF_X.
+emit_hex 00 10 00 00    # p_align = 0x1000; page alignment.
 
 # Code at file offset 84 / relative vaddr 0x54.
 #   jmp msgref
