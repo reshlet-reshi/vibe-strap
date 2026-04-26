@@ -2,12 +2,14 @@
 . ./emit
 
 # ELF Header:
-#  Magic:   7f 45 4c 46 01 01 01 00 00 00 00 00 00 00 00 00 
-#  Class:                             ELF32
-#  Data:                              2's complement, little endian
-#  Version:                           1 (current)
-#  OS/ABI:                            UNIX - System V
-#  ABI Version:                       0
+#  Magic:
+#    7f 45 4c 46                    ELF signature
+#    01                             ELFCLASS32
+#    01                             ELFDATA2LSB
+#    01                             EV_CURRENT
+#    00                             ELFOSABI_SYSV
+#    00                             ABI version
+#    00 00 00 00 00 00 00           padding
 #  Type:                              EXEC (Executable file)
 #  Machine:                           Intel 80386
 #  Version:                           0x1
