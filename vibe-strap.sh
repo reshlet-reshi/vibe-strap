@@ -56,8 +56,6 @@ emit_hex ff e2          #   jmp edx             ; goto print;
 # literal bytes of pChzMsg
 emit_raw 'vibe-strap'   #   "vibe-strap"
 emit_hex 0a             #   "\n"
-emit_raw 'vibe-strap'   #   "vibe-strap"
-emit_hex 0a             #   "\n"
 emit_hex 00             #   "\0"
 
                         # print:
