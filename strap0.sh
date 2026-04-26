@@ -3,13 +3,13 @@
 
 # ELF Header:
 #  Magic:
-#    7f 45 4c 46                    ELF signature
-#    01                             ELFCLASS32
-#    01                             ELFDATA2LSB
-#    01                             EV_CURRENT
-#    00                             ELFOSABI_SYSV
-#    00                             ABI version
-#    00 00 00 00 00 00 00           padding
+#    177 105 114 106                ELF signature
+#    001                            ELFCLASS32
+#    001                            ELFDATA2LSB
+#    001                            EV_CURRENT
+#    000                            ELFOSABI_SYSV
+#    000                            ABI version
+#    000 000 000 000 000 000 000    padding
 #  Type:                              EXEC (Executable file)
 #  Machine:                           Intel 80386
 #  Version:                           0x1
