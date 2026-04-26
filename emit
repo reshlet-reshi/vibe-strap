@@ -6,6 +6,11 @@ if [ -z "${1-}" ]; then
 fi
 
 out="$1"
+out_dir=${out%/*}
+if [ "$out_dir" != "$out" ]; then
+    mkdir -p "$out_dir"
+fi
+
 : > "$out"
 emit_raw() {
     printf '%s' "$1" >> "$out"
