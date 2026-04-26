@@ -1,7 +1,26 @@
 #!/bin/sh
 . ./emit
 
-# ELF32 header, executable, i386, entry = 0x08048054.
+# ELF Header:
+#  Magic:   7f 45 4c 46 01 01 01 00 00 00 00 00 00 00 00 00 
+#  Class:                             ELF32
+#  Data:                              2's complement, little endian
+#  Version:                           1 (current)
+#  OS/ABI:                            UNIX - System V
+#  ABI Version:                       0
+#  Type:                              EXEC (Executable file)
+#  Machine:                           Intel 80386
+#  Version:                           0x1
+#  Entry point address:               0x8048054
+#  Start of program headers:          52 (bytes into file)
+#  Start of section headers:          0 (bytes into file)
+#  Flags:                             0x0
+#  Size of this header:               52 (bytes)
+#  Size of program headers:           32 (bytes)
+#  Number of program headers:         1
+#  Size of section headers:           0 (bytes)
+#  Number of section headers:         0
+#  Section header string table index: 0
 emit '\177ELF\001\001\001\000\000\000\000\000\000\000\000\000'
 emit '\002\000\003\000\001\000\000\000\124\200\004\010'
 emit '\064\000\000\000\000\000\000\000\000\000\000\000'
