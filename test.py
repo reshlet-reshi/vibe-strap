@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / ".ignore/vibe-strap"
-EXPECTED = "vibe-strap stage0"
+EXPECTED = "vibe-strap"
 
 if __name__ == "__main__":
     try:

@@ -32,8 +32,8 @@ emit_hex 01 00 00 00    # p_type = 1; PT_LOAD, loadable segment.
 emit_hex 00 00 00 00    # p_offset = 0; segment starts at file offset 0.
 emit_hex 00 00 00 00    # p_vaddr = 0; relative virtual address.
 emit_hex 00 00 00 00    # p_paddr = 0; ignored for this executable.
-emit_hex 88 00 00 00    # p_filesz = 136; segment bytes in file.
-emit_hex 88 00 00 00    # p_memsz = 136; segment bytes in memory.
+emit_hex 81 00 00 00    # p_filesz = 129; segment bytes in file.
+emit_hex 81 00 00 00    # p_memsz = 129; segment bytes in memory.
 emit_hex 05 00 00 00    # p_flags = 5; PF_R | PF_X.
 emit_hex 00 10 00 00    # p_align = 0x1000; page alignment.
 
@@ -43,7 +43,7 @@ emit_hex eb 1b          #   jmp msgref
 emit_hex 59             #   pop ecx     ; msg
 emit_hex b8 04 00 00 00 #   mov eax, 4  ; sys_write
 emit_hex bb 01 00 00 00 #   mov ebx, 1  ; stdout
-emit_hex ba 12 00 00 00 #   mov edx, 18
+emit_hex ba 0b 00 00 00 #   mov edx, 11
 emit_hex cd 80          #   int 0x80
 emit_hex b8 01 00 00 00 #   mov eax, 1  ; sys_exit
 emit_hex 31 db          #   xor ebx, ebx
@@ -51,7 +51,8 @@ emit_hex cd 80          #   int 0x80
                         # msgref:
 emit_hex e8 e0 ff ff ff #   call start
 
-emit_raw 'vibe-strap stage0'
+emit_raw 'vibe-strap'
+
 emit_hex 0a
 
 chmod +x "$out"
