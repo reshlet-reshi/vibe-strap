@@ -8,6 +8,7 @@ if [ -z "${1-}" ]; then
 fi
 
 out="$1"
+unpatched=
 
 # Create the parent directory when the output path includes one.
 out_dir=${out%/*}
@@ -29,4 +30,36 @@ emit_hex() {
         bytes="${bytes}\\$(printf '%03o' "0x$byte")"
     done
     printf '%b' "$bytes" >> "$out"
+}
+
+patch_at() {
+    offset=$1
+    dd of="$out" bs=1 seek="$offset" conv=notrunc 2>/dev/null
+}
+
+emit_unpatched_size() {
+    set -- $(wc -c < "$out")
+    offset=$1
+    unpatched="${unpatched}${unpatched:+ }$offset"
+    emit_hex 00 00 00 00
+}
+
+patch_sizes() {
+    set -- $(wc -c < "$out")
+    size=$1
+
+    b0=$((size & 255))
+    b1=$(((size >> 8) & 255))
+    b2=$(((size >> 16) & 255))
+    b3=$(((size >> 24) & 255))
+    bytes=$(printf '\\%03o\\%03o\\%03o\\%03o' "$b0" "$b1" "$b2" "$b3")
+
+    for offset in $unpatched; do
+        printf '%b' "$bytes" | patch_at "$offset"
+    done
+}
+
+end_emit() {
+    chmod +x "$out"
+    exit 0
 }
