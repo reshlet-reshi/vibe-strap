@@ -9,7 +9,7 @@ emit_hex 01             # e_ident[EI_DATA]: ELFDATA2LSB
 emit_hex 01             # e_ident[EI_VERSION]: EV_CURRENT
 emit_hex 00             # e_ident[EI_OSABI]: ELFOSABI_SYSV
 emit_hex 00             # e_ident[EI_ABIVERSION]: 0
-emit_hex 00 00 00 00 	# e_ident[EI_PAD..]: padding
+emit_hex 00 00 00 00    # e_ident[EI_PAD..]: padding
 emit_hex 00 00 00       #  ...
 emit_hex 03 00          # e_type = 3; ET_DYN, shared object / PIE
 emit_hex 03 00          # e_machine = 3; EM_386, Intel 80386
@@ -38,21 +38,18 @@ emit_hex 05 00 00 00    # p_flags = 5; PF_R | PF_X.
 emit_hex 00 10 00 00    # p_align = 0x1000; page alignment.
 
 # Code at file offset 84 / relative vaddr 0x54.
-#   jmp msgref
-# start:
-#   pop ecx             ; msg
-#   mov eax, 4          ; sys_write
-#   mov ebx, 1          ; stdout
-#   mov edx, 18
-#   int 0x80
-#   mov eax, 1          ; sys_exit
-#   xor ebx, ebx
-#   int 0x80
-# msgref:
-#   call start
-emit_hex eb 1b 59 b8 04 00 00 00 bb 01 00 00 00 ba 12 00
-emit_hex 00 00 cd 80 b8 01 00 00 00 31 db cd 80 e8 e0 ff
-emit_hex ff ff
+emit_hex eb 1b          #   jmp msgref
+                        # start:
+emit_hex 59             #   pop ecx     ; msg
+emit_hex b8 04 00 00 00 #   mov eax, 4  ; sys_write
+emit_hex bb 01 00 00 00 #   mov ebx, 1  ; stdout
+emit_hex ba 12 00 00 00 #   mov edx, 18
+emit_hex cd 80          #   int 0x80
+emit_hex b8 01 00 00 00 #   mov eax, 1  ; sys_exit
+emit_hex 31 db          #   xor ebx, ebx
+emit_hex cd 80          #   int 0x80
+                        # msgref:
+emit_hex e8 e0 ff ff ff #   call start
 
 emit_raw 'vibe-strap stage0'
 emit_hex 0a
