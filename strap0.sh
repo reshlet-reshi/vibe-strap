@@ -2,8 +2,6 @@
 . ./emit
 
 # ELF Header:
-
-#  Magic:
 emit '\177ELF' 			# ELF signature
 emit '\001' 			# ELFCLASS32
 emit '\001'				# ELFDATA2LSB
@@ -12,14 +10,11 @@ emit '\000' 			# ELFOSABI_SYSV
 emit '\000' 			# ABI version
 emit '\000\000\000\000'	# padding
 emit '\000\000\000' 	# ...
+emit '\002\000'         # e_type = 2; ET_EXEC, executable file
+emit '\003\000'         # e_machine = 3; EM_386, Intel 80386
+emit '\001\000\000\000' # e_version = 1; EV_CURRENT
+emit '\124\200\004\010' # e_entry = 0x08048054; program entry point
 
-# TODO LATER make sure we dont have dupe stuff in
-# the comment below this
-
-#  Type:                              EXEC (Executable file)
-#  Machine:                           Intel 80386
-#  Version:                           0x1
-#  Entry point address:               0x8048054
 #  Start of program headers:          52 (bytes into file)
 #  Start of section headers:          0 (bytes into file)
 #  Flags:                             0x0
@@ -29,12 +24,6 @@ emit '\000\000\000' 	# ...
 #  Size of section headers:           0 (bytes)
 #  Number of section headers:         0
 #  Section header string table index: 0
-
-emit '\002\000'         # e_type = 2; ET_EXEC, executable file
-emit '\003\000'         # e_machine = 3; EM_386, Intel 80386
-emit '\001\000\000\000' # e_version = 1; EV_CURRENT
-emit '\124\200\004\010' # e_entry = 0x08048054; program entry point
-
 emit '\064\000\000\000\000\000\000\000\000\000\000\000'
 emit '\064\000\040\000\001\000\000\000\000\000\000\000'
 
