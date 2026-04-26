@@ -32,32 +32,40 @@ emit_hex 01 00 00 00    # p_type = 1; PT_LOAD, loadable segment.
 emit_hex 00 00 00 00    # p_offset = 0; segment starts at file offset 0.
 emit_hex 00 00 00 00    # p_vaddr = 0; relative virtual address.
 emit_hex 00 00 00 00    # p_paddr = 0; ignored for this executable.
-emit_hex 8a 00 00 00    # p_filesz = 138; segment bytes in file.
-emit_hex 8a 00 00 00    # p_memsz = 138; segment bytes in memory.
+emit_hex 8c 00 00 00    # p_filesz = 140; segment bytes in file.
+emit_hex 8c 00 00 00    # p_memsz = 140; segment bytes in memory.
 emit_hex 05 00 00 00    # p_flags = 5; PF_R | PF_X.
 emit_hex 00 10 00 00    # p_align = 0x1000; page alignment.
 
 # Code:
-emit_hex e8 00 00 00 00 #   call .+5
-emit_hex 59             #   pop ecx
-emit_hex 83 c1 06       #   add ecx, 6 ; msg
-emit_hex eb 0c          #   jmp print
 
-emit_raw 'vibe-strap'   #   "vibe-strap\n"
-emit_hex 0a
-emit_hex 00
-                        # print:
-emit_hex 89 ca          #   mov edx, ecx
+# const char pChzMsg[] = "vibe-strap\n";
+# size_t msg_sz = strlen(pChzMsg);
+emit_hex e8 00 00 00 00 #   call .+5            ; push init;
+                        # init:
+emit_hex 59             #   pop ecx             ; ecx = init
+emit_hex 83 c1 0f       #   add ecx, 15         ; ecx = pChzMsg;
+emit_hex 89 ca          #   mov edx, ecx        ; edx = pChzMsg;
                         # scan:
-emit_hex 42             #   inc edx
-emit_hex 80 3a 00       #   cmp byte [edx], 0
-emit_hex 75 fa          #   jne scan
-emit_hex 29 ca          #   sub edx, ecx
-emit_hex b8 04 00 00 00 #   mov eax, 4  ; sys_write
-emit_hex bb 01 00 00 00 #   mov ebx, 1  ; stdout
-emit_hex cd 80          #   int 0x80
-emit_hex b8 01 00 00 00 #   mov eax, 1  ; sys_exit
-emit_hex 31 db          #   xor ebx, ebx
-emit_hex cd 80          #   int 0x80
+emit_hex 42             #   inc edx             ; ++edx;
+emit_hex 80 3a 00       #   cmp byte [edx], 0   ; if (*edx != 0)
+emit_hex 75 fa          #   jne scan            ;   goto scan;
+emit_hex 42             #   inc edx             ; ++edx; // point AFTER \0
+emit_hex ff e2          #   jmp edx             ; goto print;
+
+# literal bytes of pChzMsg
+emit_raw 'vibe-strap'   #   "vibe-strap"
+emit_hex 0a             #   "\n"
+emit_hex 00             #   "\0"
+
+                        # print:
+emit_hex 4a             #   dec edx             ; --edx; // point AT \0
+emit_hex 29 ca          #   sub edx, ecx        ; edx = msg_sz;
+emit_hex b8 04 00 00 00 #   mov eax, 4          ; syscall: write
+emit_hex bb 01 00 00 00 #   mov ebx, 1          ; fd: stdout
+emit_hex cd 80          #   int 0x80            ; write(stdout, ecx, edx)
+emit_hex b8 01 00 00 00 #   mov eax, 1          ; syscall: exit
+emit_hex 31 db          #   xor ebx, ebx        ; status: 0
+emit_hex cd 80          #   int 0x80            ; exit(0)
 
 chmod +x "$out"
