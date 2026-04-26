@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / ".ignore/vibe-strap"
-EXPECTED = "vibe-strap"
+EXPECTED = "vibe-strap\n"
 
 if __name__ == "__main__":
     try:
@@ -17,7 +17,7 @@ if __name__ == "__main__":
         actual = subprocess.check_output(
             [os.fspath(OUT)], 
             text=True
-        ).rstrip("\n")
+        )
         if actual != EXPECTED:
             raise SystemExit(
                 f"expected {EXPECTED!r}, got {actual!r}"
