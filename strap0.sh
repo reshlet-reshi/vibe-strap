@@ -30,7 +30,11 @@ emit '\000\000\000' 	# ...
 #  Number of section headers:         0
 #  Section header string table index: 0
 
-emit '\002\000\003\000\001\000\000\000\124\200\004\010'
+emit '\002\000'         # e_type = 2; ET_EXEC, executable file
+emit '\003\000'         # e_machine = 3; EM_386, Intel 80386
+emit '\001\000\000\000' # e_version = 1; EV_CURRENT
+emit '\124\200\004\010' # e_entry = 0x08048054; program entry point
+
 emit '\064\000\000\000\000\000\000\000\000\000\000\000'
 emit '\064\000\040\000\001\000\000\000\000\000\000\000'
 
