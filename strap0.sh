@@ -2,29 +2,27 @@
 . ./emit
 
 # ELF Header:
-emit '\177ELF' 			# ELF signature
-emit '\001' 			# ELFCLASS32
-emit '\001'				# ELFDATA2LSB
-emit '\001'				# EV_CURRENT
-emit '\000' 			# ELFOSABI_SYSV
-emit '\000' 			# ABI version
-emit '\000\000\000\000'	# padding
-emit '\000\000\000' 	# ...
+emit '\177ELF'          # e_ident[EI_MAG0..EI_MAG3]: ELF signature
+emit '\001'             # e_ident[EI_CLASS]: ELFCLASS32
+emit '\001'             # e_ident[EI_DATA]: ELFDATA2LSB
+emit '\001'             # e_ident[EI_VERSION]: EV_CURRENT
+emit '\000'             # e_ident[EI_OSABI]: ELFOSABI_SYSV
+emit '\000'             # e_ident[EI_ABIVERSION]: 0
+emit '\000\000\000\000' # e_ident[EI_PAD..]: padding
+emit '\000\000\000'     # ...
 emit '\002\000'         # e_type = 2; ET_EXEC, executable file
 emit '\003\000'         # e_machine = 3; EM_386, Intel 80386
 emit '\001\000\000\000' # e_version = 1; EV_CURRENT
-emit '\124\200\004\010' # e_entry = 0x08048054; program entry point
 
-#  Start of program headers:          52 (bytes into file)
-#  Start of section headers:          0 (bytes into file)
-#  Flags:                             0x0
-#  Size of this header:               52 (bytes)
-#  Size of program headers:           32 (bytes)
-#  Number of program headers:         1
-#  Size of section headers:           0 (bytes)
-#  Number of section headers:         0
-#  Section header string table index: 0
+# e_entry points at the first instruction:
+#   base vaddr  0x08048000 (p_vaddr in the program header)
+# + code offset       0x54 (52-byte ELF header + 32-byte program header)
+# = entry vaddr 0x08048054
+emit '\124\200\004\010'
+
+# e_phoff = 52; e_shoff = 0; e_flags = 0.
 emit '\064\000\000\000\000\000\000\000\000\000\000\000'
+# e_ehsize = 52; e_phentsize = 32; e_phnum = 1; no section headers.
 emit '\064\000\040\000\001\000\000\000\000\000\000\000'
 
 # Program header: one RX PT_LOAD segment containing the whole file.
