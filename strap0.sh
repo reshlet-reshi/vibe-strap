@@ -1,24 +1,5 @@
 #!/bin/sh
-#
-# strap0.sh - first host bootstrap sketch for vibe-strap.
-#
-# Contract:
-#   - requires /bin/sh
-#   - uses printf/redirection for byte emission
-#   - accepts chmod +x as the one external Unix utility
-#
-# It emits a tiny 32-bit x86 Linux ELF executable that uses only int 0x80
-# syscalls: write(1, msg, len), then exit(0).
-
-set -eu
-
-out=${1:-./vibe-stage0}
-
-emit() {
-    printf '%b' "$1" >> "$out"
-}
-
-: > "$out"
+. ./emit
 
 # ELF32 header, executable, i386, entry = 0x08048054.
 emit '\177ELF\001\001\001\000\000\000\000\000\000\000\000\000'

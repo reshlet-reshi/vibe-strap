@@ -1,0 +1,12 @@
+set -eu
+
+if [ -z "${1-}" ]; then
+    printf '%s\n' 'missing argument 1 (out file)' >&2
+    exit 1
+fi
+
+out="$1"
+: > "$out"
+emit() {
+    printf '%b' "$1" >> "$out"
+}
