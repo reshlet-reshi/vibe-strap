@@ -3,11 +3,11 @@ OUT ?= .ignore/vibe-strap
 
 all: $(OUT) test
 
-$(OUT): strap0.sh emit.sh
-	sh strap0.sh $(OUT)
+$(OUT): vibe-strap.sh emit.sh
+	sh vibe-strap.sh $(OUT)
 
-test: test-stage0.sh strap0.sh emit.sh
-	@sh test-stage0.sh $(OUT)
+test: test.sh vibe-strap.sh emit.sh
+	@sh test.sh $(OUT)
 
 clean:
 	rm -f $(OUT)

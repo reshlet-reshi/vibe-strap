@@ -9,7 +9,7 @@ fi
 out="$1"
 expected='vibe-strap stage0'
 
-sh strap0.sh "$out"
+sh vibe-strap.sh "$out"
 actual=$(./"$out")
 test "$actual" = "$expected"
 printf '%s\n' 'smoke test passed'
