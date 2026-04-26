@@ -1,4 +1,4 @@
-OUT ?= vibe-stage0
+OUT ?= vibe-strap
 .PHONY: all test clean
 
 all: $(OUT) test
