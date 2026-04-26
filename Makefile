@@ -1,5 +1,4 @@
 OUT ?= vibe-stage0
-EXPECTED_STRAP = wrote $(OUT)
 EXPECTED_STAGE0 = vibe-strap stage0
 
 .PHONY: all test clean
@@ -11,8 +10,7 @@ $(OUT): strap0.sh emit
 
 test:
 	@set -eu; \
-	actual=$$(sh strap0.sh $(OUT)); \
-	test "$$actual" = "$(EXPECTED_STRAP)"; \
+	sh strap0.sh $(OUT); \
 	actual=$$(./$(OUT)); \
 	test "$$actual" = "$(EXPECTED_STAGE0)"; \
 	printf '%s\n' 'smoke test passed'

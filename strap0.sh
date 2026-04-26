@@ -55,5 +55,3 @@ emit_raw 'vibe-strap stage0'
 emit_hex 0a
 
 chmod +x "$out"
-
-printf 'wrote %s\n' "$out"
