@@ -39,7 +39,7 @@ emit_hex 00 10 00 00    # p_align = 0x1000; page alignment.
 
 # Code:
 
-# const char pChzMsg[] = "vibe-strap\nvibe-strap\n";
+# const char pChzMsg[] = "vibe-strap\n";
 # size_t msg_sz = strlen(pChzMsg);
 emit_hex e8 00 00 00 00 #   call .+5            ; push init;
                         # init:
