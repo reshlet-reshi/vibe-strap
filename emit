@@ -1,7 +1,7 @@
 # shellcheck shell=sh
 set -eu
 
-# Sourced by vibe-strap.sh. The caller passes inlines as $2 and output
+# Sourced by vibe-strap. The caller passes inlines as $2 and output
 # file as $3. This helper truncates the output before defining emit functions.
 if [ -z "${2-}" ]; then
     printf '%s\n' 'missing argument 2 (inlines)' >&2

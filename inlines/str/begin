@@ -1,8 +1,8 @@
 # shellcheck shell=sh
-# only meant to be used paired with end-str.sh
+# only meant to be used paired with end-str
 
 # const char str[] = "...";     // stored in ecx
-# size_t str_sz = strlen(str);  // stored in edx (patched by end-str.sh)
+# size_t str_sz = strlen(str);  // stored in edx (patched by end-str)
 emit_hex e8 00 00 00 00 #   call .+5            ; push init;
                         # init:
 emit_hex 59             #   pop ecx             ; ecx = init

@@ -7,11 +7,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 EXPECTED = "vibe-strap\n"
 SHELL_FILES = [
-    ROOT / "vibe-strap.sh",
-    ROOT / "emit.sh",
-    ROOT / "inlines/elf/begin.sh",
-    ROOT / "inlines/str/begin.sh",
-    ROOT / "inlines/str/end.sh",
+    ROOT / "vibe-strap",
+    ROOT / "emit",
+    ROOT / "inlines/elf/begin",
+    ROOT / "inlines/str/begin",
+    ROOT / "inlines/str/end",
 ]
 
 
@@ -34,8 +34,8 @@ def test_smoke():
         subprocess.run(
             [
                 "sh",
-                os.fspath(ROOT / "vibe-strap.sh"),
-                os.fspath(ROOT / "emit.sh"),
+                os.fspath(ROOT / "vibe-strap"),
+                os.fspath(ROOT / "emit"),
                 os.fspath(ROOT / "inlines"),
                 os.fspath(out),
             ],
