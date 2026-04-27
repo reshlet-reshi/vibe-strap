@@ -1,9 +1,9 @@
 set -eu
 
-# Sourced by vibe-strap.sh. The caller passes the include path as $2 and output
+# Sourced by vibe-strap.sh. The caller passes inlines as $2 and output
 # file as $3. This helper truncates the output before defining emit functions.
 if [ -z "${2-}" ]; then
-    printf '%s\n' 'missing argument 2 (include path)' >&2
+    printf '%s\n' 'missing argument 2 (inlines)' >&2
     exit 1
 fi
 
@@ -12,7 +12,7 @@ if [ -z "${3-}" ]; then
     exit 1
 fi
 
-include_path=$2
+inlines=$2
 out="$3"
 unpatched=
 
@@ -38,8 +38,8 @@ emit_hex() {
     printf '%b' "$bytes" >> "$out"
 }
 
-include() {
-    . "$include_path/$1"
+inline() {
+    . "$inlines/$1"
 }
 
 patch_at() {

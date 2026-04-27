@@ -1,11 +1,11 @@
 #!/bin/sh
 . "$1"
-include elf/begin.sh
+inline elf/begin.sh
 
-include str/begin.sh
+inline str/begin.sh
 emit_raw 'vibe-strap'   #   "vibe-strap"
 emit_hex 0a             #   "\n"
-include str/end.sh
+inline str/end.sh
 
 # begin/end-str leaves:
 #  - str addr in ecx
