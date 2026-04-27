@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # only meant to be used paired with end-str.sh
 
 # const char str[] = "...";     // stored in ecx

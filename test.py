@@ -6,6 +6,26 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 EXPECTED = "vibe-strap\n"
+SHELL_FILES = [
+    ROOT / "vibe-strap.sh",
+    ROOT / "emit.sh",
+    ROOT / "inlines/elf/begin.sh",
+    ROOT / "inlines/str/begin.sh",
+    ROOT / "inlines/str/end.sh",
+]
+
+
+def test_shellcheck():
+    subprocess.run(
+        [
+            "shellcheck",
+            "--exclude", "SC1090",
+            *map(os.fspath, SHELL_FILES)
+        ],
+        cwd=ROOT,
+        check=True
+    )
+
 
 def test_smoke():
     with tempfile.TemporaryDirectory() as tmp:
@@ -33,4 +53,5 @@ def test_smoke():
         print("smoke test passed")
 
 if __name__ == "__main__":
+    test_shellcheck()
     test_smoke()

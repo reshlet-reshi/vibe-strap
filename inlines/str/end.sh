@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # only meant to be used paired with/after begin-str.sh
 # begin-str.sh leaves str addr in ecx
 

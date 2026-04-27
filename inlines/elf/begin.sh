@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # ELF Header:
 emit_hex 7f             # e_ident[EI_MAG0..EI_MAG3]: ELF signature
 emit_raw 'ELF'          #  ...

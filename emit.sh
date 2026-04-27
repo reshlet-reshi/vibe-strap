@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 set -eu
 
 # Sourced by vibe-strap.sh. The caller passes inlines as $2 and output
@@ -48,14 +49,14 @@ patch_at() {
 }
 
 emit_unpatched_size() {
-    set -- $(wc -c < "$out")
+    set -- "$(wc -c < "$out")"
     offset=$1
     unpatched="${unpatched}${unpatched:+ }$offset"
     emit_hex 00 00 00 00
 }
 
 patch_sizes() {
-    set -- $(wc -c < "$out")
+    set -- "$(wc -c < "$out")"
     size=$1
 
     b0=$((size & 255))
