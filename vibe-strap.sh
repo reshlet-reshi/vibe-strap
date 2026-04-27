@@ -2,10 +2,10 @@
 . "$1"
 include header.sh
 
-include begin-str.sh
+include str/begin.sh
 emit_raw 'vibe-strap'   #   "vibe-strap"
 emit_hex 0a             #   "\n"
-include end-str.sh
+include str/end.sh
 
 # begin/end-str leaves:
 #  - str addr in ecx
