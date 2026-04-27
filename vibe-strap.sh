@@ -1,6 +1,6 @@
 #!/bin/sh
 . "$1"
-include header.sh
+include elf/begin.sh
 
 include str/begin.sh
 emit_raw 'vibe-strap'   #   "vibe-strap"
