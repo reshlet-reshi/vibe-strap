@@ -1,11 +1,11 @@
 #!/bin/sh
-. ./emit.sh
-. ./lib/header.sh
+. "$1"
+include header.sh
 
-. ./lib/begin-str.sh
+include begin-str.sh
 emit_raw 'vibe-strap'   #   "vibe-strap"
 emit_hex 0a             #   "\n"
-. ./lib/end-str.sh
+include end-str.sh
 
 # begin/end-str leaves:
 #  - str addr in ecx

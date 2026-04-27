@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-OUT = ROOT / ".ignore/vibe-strap"
 EXPECTED = "vibe-strap\n"
 
 def test_smoke():
-    try:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        out = tmp_path / "vibe-strap"
         subprocess.run(
-            ["sh", "vibe-strap.sh", os.fspath(OUT)],
-            cwd=ROOT,
+            [
+                "sh",
+                os.fspath(ROOT / "vibe-strap.sh"),
+                os.fspath(ROOT / "emit.sh"),
+                os.fspath(ROOT / "include"),
+                os.fspath(out),
+            ],
+            cwd=tmp_path,
             check=True
         )
         actual = subprocess.check_output(
-            [os.fspath(OUT)], 
+            [os.fspath(out)],
             text=True
         )
         if actual != EXPECTED:
@@ -23,11 +31,6 @@ def test_smoke():
                 f"expected {EXPECTED!r}, got {actual!r}"
             )
         print("smoke test passed")
-    finally:
-        try:
-            OUT.unlink()
-        except FileNotFoundError:
-            pass
 
 if __name__ == "__main__":
     test_smoke()

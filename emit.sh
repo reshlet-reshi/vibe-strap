@@ -1,13 +1,19 @@
 set -eu
 
-# Sourced by vibe-strap.sh. The caller passes the output file as $1, and
-# this helper truncates it before defining append-only emit functions.
-if [ -z "${1-}" ]; then
-    printf '%s\n' 'missing argument 1 (out file)' >&2
+# Sourced by vibe-strap.sh. The caller passes the include path as $2 and output
+# file as $3. This helper truncates the output before defining emit functions.
+if [ -z "${2-}" ]; then
+    printf '%s\n' 'missing argument 2 (include path)' >&2
     exit 1
 fi
 
-out="$1"
+if [ -z "${3-}" ]; then
+    printf '%s\n' 'missing argument 3 (out file)' >&2
+    exit 1
+fi
+
+include_path=$2
+out="$3"
 unpatched=
 
 # Create the parent directory when the output path includes one.
@@ -30,6 +36,10 @@ emit_hex() {
         bytes="${bytes}\\$(printf '%03o' "0x$byte")"
     done
     printf '%b' "$bytes" >> "$out"
+}
+
+include() {
+    . "$include_path/$1"
 }
 
 patch_at() {
