@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parent
 OUT = ROOT / ".ignore/vibe-strap"
 EXPECTED = "vibe-strap\n"
 
-if __name__ == "__main__":
+def test_smoke():
     try:
         subprocess.run(
             ["sh", "vibe-strap.sh", os.fspath(OUT)],
@@ -28,3 +28,6 @@ if __name__ == "__main__":
             OUT.unlink()
         except FileNotFoundError:
             pass
+
+if __name__ == "__main__":
+    test_smoke()
