@@ -2,8 +2,7 @@
 
 Vibe coding a self hosting assembler.
 
-Try testing with:
-
+Try:
 ```sh
-python3 test.py
+sh runme.sh
 ```
