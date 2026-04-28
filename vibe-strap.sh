@@ -1,20 +1,76 @@
 #!/bin/sh
-. "$1"
-inline elf/begin.sh
+set -eu
 
-inline str/begin.sh
-emit_raw 'vibe-strap'   #   "vibe-strap"
-emit_hex 0a             #   "\n"
-inline str/end.sh
+if [ -z "${1-}" ]; then
+    printf '%s\n' 'missing argument 1 (inlines)' >&2
+    exit 1
+fi
 
-# begin/end-str leaves:
-#  - str addr in ecx
-#  - str len in edx
-emit_hex b8 04 00 00 00 #   mov eax, 4      ; syscall: write
-emit_hex bb 01 00 00 00 #   mov ebx, 1      ; fd: stdout
-emit_hex cd 80          #   int 0x80        ; write(stdout, ecx, edx)
-emit_hex b8 01 00 00 00 #   mov eax, 1      ; syscall: exit
-emit_hex 31 db          #   xor ebx, ebx    ; status: 0
-emit_hex cd 80          #   int 0x80        ; exit(0)
+if [ -z "${2-}" ]; then
+    printf '%s\n' 'missing argument 2 (out file)' >&2
+    exit 1
+fi
 
-inline elf/end.sh
+inlines=$1
+out="$2"
+unpatched=
+
+# Create the parent directory when the output path includes one.
+out_dir=${out%/*}
+if [ "$out_dir" != "$out" ]; then
+    mkdir -p "$out_dir"
+fi
+
+# Ensure/truncate output file.
+: > "$out"
+
+emit_raw() {
+    printf '%s' "$1" >> "$out"
+}
+
+emit_hex() {
+    bytes=
+    for byte do
+        # Convert each hex byte to an octal escape for POSIX printf %b.
+        bytes="${bytes}\\$(printf '%03o' "0x$byte")"
+    done
+    printf '%b' "$bytes" >> "$out"
+}
+
+inline() {
+    . "$inlines/$1"
+}
+
+patch_at() {
+    offset=$1
+    dd of="$out" bs=1 seek="$offset" conv=notrunc 2>/dev/null
+}
+
+emit_unpatched_size() {
+    set -- "$(wc -c < "$out")"
+    offset=$1
+    unpatched="${unpatched}${unpatched:+ }$offset"
+    emit_hex 00 00 00 00
+}
+
+patch_sizes() {
+    set -- "$(wc -c < "$out")"
+    size=$1
+
+    b0=$((size & 255))
+    b1=$(((size >> 8) & 255))
+    b2=$(((size >> 16) & 255))
+    b3=$(((size >> 24) & 255))
+    bytes=$(printf '\\%03o\\%03o\\%03o\\%03o' "$b0" "$b1" "$b2" "$b3")
+
+    for offset in $unpatched; do
+        printf '%b' "$bytes" | patch_at "$offset"
+    done
+}
+
+end_emit() {
+    chmod +x "$out"
+    exit 0
+}
+
+. ./main.sh

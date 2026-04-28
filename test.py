@@ -31,11 +31,10 @@ def test_smoke():
             [
                 "sh",
                 os.fspath(ROOT / "vibe-strap.sh"),
-                os.fspath(ROOT / "emit.sh"),
                 os.fspath(ROOT / "inlines"),
                 os.fspath(out),
             ],
-            cwd=tmp_path,
+            cwd=ROOT,
             check=True
         )
         actual = subprocess.check_output(
