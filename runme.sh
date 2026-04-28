@@ -106,6 +106,13 @@ exec_for_each_find_by_name() {
 }
 exec_for_each_find_by_name '*.sh' "${shellcheck}"
 
+# vendored muslcc around?
+muslcc_archive="./vendor/muslcc/x86_64-linux-musl-cross.tgz"
+if ! test -f "$muslcc_archive"; then
+    errln "${name}: vendored muslcc archive '${muslcc_archive}' not found"
+    exit 1
+fi
+
 # re-creatable tmp dir
 tmp=
 cleanup() {
@@ -177,6 +184,48 @@ _test() {
     cleanup
 }
 
+# test unpacking vendored cc, can compiling a test file
+_test_c_exit0() {
+    _test_c_src="./experiments/exit0.c"
+
+    if ! test -f "$_test_c_src"; then
+        errln "${name}: C experiment '${_test_c_src}' not found"
+        exit 1
+    fi
+
+    tmp="$(mktemp -d)"
+    tar -xzf "$muslcc_archive" -C "$tmp"
+
+    _test_c_cc="${tmp}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-cc"
+    _test_c_bin="${tmp}/exit0"
+    _test_c_got="${tmp}/exit0.stdout.txt"
+
+    "$_test_c_cc" -static -o "$_test_c_bin" "$_test_c_src"
+
+    if "$_test_c_bin" > "$_test_c_got"; then
+        _test_c_status=0
+    else
+        _test_c_status="$?"
+    fi
+
+    if ! cmp -s /dev/null "$_test_c_got"; then
+        errln 'wanted:'
+        cat /dev/null >&2
+        errln 'got:'
+        cat "$_test_c_got" >&2
+        exit 1
+    fi
+    if test "$_test_c_status" != 0; then
+        errln 'wanted exit status:'
+        errln '0'
+        errln 'got exit status:'
+        errln "$_test_c_status"
+        exit 1
+    fi
+
+    cleanup
+}
+
 _test_dir() {
     _test_dir_dir="$1"
     _test_dir_base="$(basename "$_test_dir_dir")"
@@ -218,4 +267,5 @@ _test_all() {
 
 # actually test
 _test_all
+_test_c_exit0
 printf 'OK\n'

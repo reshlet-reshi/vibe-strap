@@ -1,0 +1,29 @@
+x86_64-linux-musl GCC toolchain
+===============================
+
+This directory vendors a prebuilt x86_64-linux-musl GCC cross toolchain from
+musl.cc for x86_64 Linux hosts.
+
+The vendored archive is:
+
+    x86_64-linux-musl-cross.tgz
+
+It was downloaded from:
+
+    https://more.musl.cc/x86_64-linux-musl/x86_64-linux-musl-cross.tgz
+
+The unpacked archive root is expected to be:
+
+    x86_64-linux-musl-cross/
+
+The compiler entrypoint used by runme.sh is:
+
+    x86_64-linux-musl-cross/bin/x86_64-linux-musl-cc
+
+Observed toolchain version:
+
+    GCC 11.2.1 20211120
+
+SHA256:
+
+    c6226824d6b7214ce974344b186179c9fa89be3c33dd7431c4b6585649ce840b
