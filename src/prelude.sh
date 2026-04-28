@@ -31,6 +31,22 @@ emit_hex() {
     printf '%b' "$bytes" >> "$out"
 }
 
+inline_std() {
+    if test "$#" -ne 1; then
+        printf '%s\n' 'inline_std must be passed exactly one argument' >&2
+        exit 2
+    fi
+
+    std_file="./src/std/$1.sh"
+    if ! test -f "$std_file"; then
+        printf '%s\n' "standard inline file '${std_file}' not found" >&2
+        exit 1
+    fi
+
+    # shellcheck disable=SC1090
+    . "$std_file"
+}
+
 patch_at() {
     offset=$1
     dd of="$out" bs=1 seek="$offset" conv=notrunc 2>/dev/null
