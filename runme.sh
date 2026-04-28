@@ -165,6 +165,41 @@ _test() {
     cleanup
 }
 
+_test_dir() {
+    _test_dir_dir="$1"
+    _test_dir_base="$(basename "$_test_dir_dir")"
+    _test_dir_src="${_test_dir_dir}/${_test_dir_base}.sh"
+    _test_dir_stdout="${_test_dir_dir}/stdout.txt"
+
+    if ! test -f "$_test_dir_src"; then
+        errln "${name}: test source '${_test_dir_src}' not found"
+        exit 1
+    fi
+    if ! test -f "$_test_dir_stdout"; then
+        errln "${name}: test stdout '${_test_dir_stdout}' not found"
+        exit 1
+    fi
+
+    _test "$_test_dir_src" "$_test_dir_stdout"
+}
+
+_test_all() {
+    _test_all_seen=false
+
+    for _test_all_dir in ./tests/*; do
+        if ! test -d "$_test_all_dir"; then
+            continue
+        fi
+        _test_all_seen=true
+        _test_dir "$_test_all_dir"
+    done
+
+    if test "$_test_all_seen" = false; then
+        errln "${name}: no tests found"
+        exit 1
+    fi
+}
+
 # actually test
-_test './tests/hello.sh' './tests/stdout.txt'
+_test_all
 printf 'OK\n'

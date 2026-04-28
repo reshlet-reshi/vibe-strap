@@ -1,0 +1,8 @@
+# shellcheck shell=sh
+. ./std/elf/begin.sh
+
+emit_hex b8 01 00 00 00 #   mov eax, 1      ; syscall: exit
+emit_hex 31 db          #   xor ebx, ebx    ; status: 0
+emit_hex cd 80          #   int 0x80        ; exit(0)
+
+. ./std/elf/end.sh
