@@ -84,6 +84,9 @@ fi
 # run from our dir, to avoid confusion.
 cd "${dir}" > /dev/null
 
+cache="./.ignore/.cache"
+mkdir -p "${cache}"
+
 # re-creatable tmp dir
 tmp=
 cleanup() {
@@ -102,11 +105,12 @@ if ! test -f "${shellcheck_archive}"; then
     exit 1
 fi
 
-tmp="$(mktemp -d)"
-tar -xf "${shellcheck_archive}" -C "${tmp}"
-
 # vendored shellcheck executable around?
-shellcheck="${tmp}/shellcheck-v0.11.0/shellcheck"
+shellcheck="${cache}/shellcheck-v0.11.0/shellcheck"
+if ! test -f "${shellcheck}"; then
+    rm -rf "${cache}/shellcheck-v0.11.0"
+    tar -xf "${shellcheck_archive}" -C "${cache}"
+fi
 if ! test -f "${shellcheck}"; then
     errln "${name}: vendored shellcheck '${shellcheck}' not found"
     exit 1
@@ -123,10 +127,9 @@ exec_for_each_find_by_name() {
     # The '{} +' line noise means: 
     # Use find's batched exec form so each tool run receives as many matching
     # paths as will fit in one command line, avoiding one process per file.
-    find . -name "$1" -exec "$2" {} +
+    find . -path './.ignore' -prune -o -name "$1" -exec "$2" {} +
 }
 exec_for_each_find_by_name '*.sh' "${shellcheck}"
-cleanup
 
 # vendored muslcc around?
 muslcc_archive="./vendor/muslcc/x86_64-linux-musl-cross.tgz"
@@ -204,10 +207,18 @@ _test_c_exit0() {
         exit 1
     fi
 
-    tmp="$(mktemp -d)"
-    tar -xzf "$muslcc_archive" -C "$tmp"
+    _test_c_cc="${cache}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-cc"
+    if ! test -f "$_test_c_cc"; then
+        rm -rf "${cache}/x86_64-linux-musl-cross"
+        tar -xzf "$muslcc_archive" -C "$cache"
+    fi
 
-    _test_c_cc="${tmp}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-cc"
+    if ! test -f "$_test_c_cc"; then
+        errln "${name}: vendored muslcc compiler '${_test_c_cc}' not found"
+        exit 1
+    fi
+
+    tmp="$(mktemp -d)"
     _test_c_bin="${tmp}/exit0"
     _test_c_got="${tmp}/exit0.stdout.txt"
 
