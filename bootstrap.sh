@@ -2,10 +2,7 @@
 
 set -eu
 
-# Locate the repository root from the script path so callers can run this from
-# any working directory.
 name="$(basename "$0")"
-dir="$(dirname "$0")"
 
 errln() {
     if test "$#" -ne 1; then
@@ -28,14 +25,11 @@ if test "${system}" != Linux; then
     exit 1
 fi
 
-cd "${dir}" > /dev/null
+rm -rf ./.ignore ./runme
 
-# Reuse unpacked vendor archives between runs. The whole directory is ignored
-# by git.
 cache="./.ignore/.cache"
 mkdir -p "${cache}"
 
-# Bootstrap runme.c with the vendored static musl compiler.
 muslcc_archive="./vendor/muslcc/x86_64-linux-musl-cross.tgz"
 if ! test -f "$muslcc_archive"; then
     errln "${name}: vendored muslcc archive '${muslcc_archive}' not found"
@@ -44,7 +38,6 @@ fi
 
 cc="${cache}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-cc"
 if ! test -f "$cc"; then
-    # Recreate the expected unpack root if the compiler is missing.
     rm -rf "${cache}/x86_64-linux-musl-cross"
     tar -xzf "$muslcc_archive" -C "$cache"
 fi
@@ -54,5 +47,4 @@ if ! test -f "$cc"; then
     exit 1
 fi
 
-# The resulting binary is intentionally untracked; see .gitignore.
 "$cc" -static -o ./runme ./runme.c
