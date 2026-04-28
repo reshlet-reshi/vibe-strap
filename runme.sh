@@ -103,4 +103,37 @@ find_shell_files() {
 }
 find_shell_files | xargs "${shellcheck}"
 
-# TODO : port rest of test.py
+# make a temp dir for output
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+
+# output file
+OUT="${tmp}/a.out"
+
+# write a scratch script to output the binary
+DRIVER="${tmp}/driver.sh"
+printf '. ./vibe-strap.sh\n' >> "$DRIVER"
+printf '. ./hello.sh\n' >> "$DRIVER"
+
+# invoke the driver to make OUT
+sh "$DRIVER" "$OUT"
+
+# temp file to store executable output
+ACTUAL="${tmp}/actual.txt"
+
+# run OUT
+"$OUT" > "$ACTUAL"
+
+# expected output
+EXPECTED="${tmp}/expected.txt"
+printf 'Hello World!\n' > "$EXPECTED"
+
+# check if we got what we wanted
+if ! cmp -s "$EXPECTED" "$ACTUAL"; then
+    printf 'expected:\n'
+    cat "$EXPECTED"
+    printf 'got:\n'
+    cat "$ACTUAL"
+    exit 1
+fi
+printf 'smoke test passed\n'
