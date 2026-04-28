@@ -1,10 +1,10 @@
 # shellcheck shell=sh
-. ./inlines/elf/begin.sh
+. ./std/elf/begin.sh
 
-. ./inlines/str/begin.sh
+. ./std/str/begin.sh
 emit_raw 'vibe-strap'   #   "vibe-strap"
 emit_hex 0a             #   "\n"
-. ./inlines/str/end.sh
+. ./std/str/end.sh
 
 # begin/end-str leaves:
 #  - str addr in ecx
@@ -16,4 +16,4 @@ emit_hex b8 01 00 00 00 #   mov eax, 1      ; syscall: exit
 emit_hex 31 db          #   xor ebx, ebx    ; status: 0
 emit_hex cd 80          #   int 0x80        ; exit(0)
 
-. ./inlines/elf/end.sh
+. ./std/elf/end.sh
