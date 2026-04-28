@@ -31,7 +31,6 @@ def test_smoke():
             [
                 "sh",
                 os.fspath(ROOT / "vibe-strap.sh"),
-                os.fspath(ROOT / "inlines"),
                 os.fspath(out),
             ],
             cwd=ROOT,

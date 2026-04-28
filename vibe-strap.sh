@@ -2,17 +2,11 @@
 set -eu
 
 if [ -z "${1-}" ]; then
-    printf '%s\n' 'missing argument 1 (inlines)' >&2
+    printf '%s\n' 'missing argument 1 (out file)' >&2
     exit 1
 fi
 
-if [ -z "${2-}" ]; then
-    printf '%s\n' 'missing argument 2 (out file)' >&2
-    exit 1
-fi
-
-inlines=$1
-out="$2"
+out="$1"
 unpatched=
 
 # Create the parent directory when the output path includes one.
@@ -35,10 +29,6 @@ emit_hex() {
         bytes="${bytes}\\$(printf '%03o' "0x$byte")"
     done
     printf '%b' "$bytes" >> "$out"
-}
-
-inline() {
-    . "$inlines/$1"
 }
 
 patch_at() {
