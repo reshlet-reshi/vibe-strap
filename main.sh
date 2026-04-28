@@ -6,7 +6,7 @@ emit_raw 'vibe-strap'   #   "vibe-strap"
 emit_hex 0a             #   "\n"
 . ./std/str/end.sh
 
-# begin/end-str leaves:
+# ./std/str/begin+end leaves:
 #  - str addr in ecx
 #  - str len in edx
 emit_hex b8 04 00 00 00 #   mov eax, 4      ; syscall: write

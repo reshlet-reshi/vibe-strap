@@ -1,6 +1,6 @@
 # shellcheck shell=sh
-# only meant to be used paired with/after begin-str
-# begin-str leaves str addr in ecx
+# only meant to be used paired with/after std/str/begin.sh
+# std/str/begin.sh leaves str addr in ecx
 
 # trailing null
 emit_hex 00             #   "\0"
