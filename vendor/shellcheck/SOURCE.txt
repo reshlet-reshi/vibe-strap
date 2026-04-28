@@ -1,0 +1,18 @@
+ShellCheck 0.11.0 source
+========================
+
+This directory vendors a compiled ShellCheck 0.11.0 binary for x86_64 Linux.
+ShellCheck is licensed under the GNU General Public License, version 3; see
+LICENSE.txt.
+
+The corresponding source release archive is included as:
+
+    shellcheck-v0.11.0-source.tar.gz
+
+It was downloaded from the upstream release tag:
+
+    https://github.com/koalaman/shellcheck/archive/refs/tags/v0.11.0.tar.gz
+
+The unpacked archive root is expected to be:
+
+    shellcheck-0.11.0/
