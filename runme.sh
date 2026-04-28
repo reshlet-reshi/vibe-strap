@@ -176,8 +176,7 @@ _test_dir() {
         exit 1
     fi
     if ! test -f "$_test_dir_stdout"; then
-        errln "${name}: test stdout '${_test_dir_stdout}' not found"
-        exit 1
+        _test_dir_stdout=/dev/null
     fi
 
     _test "$_test_dir_src" "$_test_dir_stdout"
