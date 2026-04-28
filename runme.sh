@@ -143,7 +143,7 @@ _assemble() {
 
     # shellcheck disable=SC2016
     sh_call_2 vibe-strap "$_assemble_out" "$_assemble_script" '
-        . ./vibe-strap.sh
+        . ./prelude.sh
         . "$2"
     '
 }
