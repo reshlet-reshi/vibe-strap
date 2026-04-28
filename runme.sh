@@ -101,7 +101,6 @@ fi
 find_shell_files() {
     find . -name '*.sh'
 }
-excludes=SC1090
-find_shell_files | xargs "${shellcheck}" --exclude "${excludes}"
+find_shell_files | xargs "${shellcheck}"
 
 # TODO : port rest of test.py

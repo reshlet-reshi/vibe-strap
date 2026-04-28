@@ -15,7 +15,6 @@ def test_shellcheck():
     subprocess.run(
         [
             os.fspath(SHELLCHECK),
-            "--exclude", "SC1090",
             *map(os.fspath, shell_files)
         ],
         cwd=ROOT,
