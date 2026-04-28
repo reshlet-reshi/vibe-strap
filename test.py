@@ -6,21 +6,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 EXPECTED = "vibe-strap\n"
-SHELL_FILES = [
-    ROOT / "vibe-strap",
-    ROOT / "emit",
-    ROOT / "inlines/elf/begin",
-    ROOT / "inlines/str/begin",
-    ROOT / "inlines/str/end",
-]
+SHELLCHECK = ROOT / "vendor/shellcheck/x86_64-Linux/shellcheck"
 
 
 def test_shellcheck():
+    SHELLCHECK.chmod(SHELLCHECK.stat().st_mode | 0o111)
+    shell_files = sorted(ROOT.rglob("*.sh"))
     subprocess.run(
         [
-            "shellcheck",
+            os.fspath(SHELLCHECK),
             "--exclude", "SC1090",
-            *map(os.fspath, SHELL_FILES)
+            *map(os.fspath, shell_files)
         ],
         cwd=ROOT,
         check=True
@@ -34,8 +30,8 @@ def test_smoke():
         subprocess.run(
             [
                 "sh",
-                os.fspath(ROOT / "vibe-strap"),
-                os.fspath(ROOT / "emit"),
+                os.fspath(ROOT / "vibe-strap.sh"),
+                os.fspath(ROOT / "emit.sh"),
                 os.fspath(ROOT / "inlines"),
                 os.fspath(out),
             ],

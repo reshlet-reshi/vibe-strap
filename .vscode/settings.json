@@ -1,7 +1,0 @@
-{
-  "files.associations": {
-    "**/inlines/**": "shellscript",
-    "emit": "shellscript",
-    "*vibe-strap": "shellscript",
-  }
-}

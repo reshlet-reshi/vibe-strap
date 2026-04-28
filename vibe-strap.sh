@@ -1,0 +1,20 @@
+#!/bin/sh
+. "$1"
+inline elf/begin.sh
+
+inline str/begin.sh
+emit_raw 'vibe-strap'   #   "vibe-strap"
+emit_hex 0a             #   "\n"
+inline str/end.sh
+
+# begin/end-str leaves:
+#  - str addr in ecx
+#  - str len in edx
+emit_hex b8 04 00 00 00 #   mov eax, 4      ; syscall: write
+emit_hex bb 01 00 00 00 #   mov ebx, 1      ; fd: stdout
+emit_hex cd 80          #   int 0x80        ; write(stdout, ecx, edx)
+emit_hex b8 01 00 00 00 #   mov eax, 1      ; syscall: exit
+emit_hex 31 db          #   xor ebx, ebx    ; status: 0
+emit_hex cd 80          #   int 0x80        ; exit(0)
+
+inline elf/end.sh

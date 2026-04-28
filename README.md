@@ -1,3 +1,9 @@
 # vibe-strap
 
-vibe coding a self hosting assembler
+Vibe coding a self hosting assembler.
+
+Try testing with:
+
+```sh
+python3 test.py
+```
