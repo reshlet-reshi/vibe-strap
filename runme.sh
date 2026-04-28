@@ -105,7 +105,8 @@ find_shell_files | xargs "${shellcheck}"
 
 # make a temp dir for output
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+trap 'rm -rf "$tmp"' EXIT
+trap 'rm -rf "$tmp"; exit 130' HUP INT TERM
 
 # output file
 OUT="${tmp}/a.out"
