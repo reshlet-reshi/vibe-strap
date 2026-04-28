@@ -1,1 +1,2 @@
 vendor/muslcc/x86_64-linux-musl-cross.tgz filter=lfs diff=lfs merge=lfs -text
+vendor/shellcheck/shellcheck-v0.11.0.linux.x86_64.tar.xz filter=lfs diff=lfs merge=lfs -text
