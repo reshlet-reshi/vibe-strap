@@ -84,8 +84,29 @@ fi
 # run from our dir, to avoid confusion.
 cd "${dir}" > /dev/null
 
-# vendored shellcheck around and executable?
-shellcheck="./vendor/shellcheck/${machine}-${system}/shellcheck"
+# re-creatable tmp dir
+tmp=
+cleanup() {
+    if [ -n "$tmp" ]; then
+        rm -rf "$tmp"
+        tmp=
+    fi
+}
+trap cleanup EXIT
+trap 'cleanup; exit 130' HUP INT TERM
+
+# vendored shellcheck archive around?
+shellcheck_archive="./vendor/shellcheck/shellcheck-v0.11.0.linux.x86_64.tar.xz"
+if ! test -f "${shellcheck_archive}"; then
+    errln "${name}: vendored shellcheck archive '${shellcheck_archive}' not found"
+    exit 1
+fi
+
+tmp="$(mktemp -d)"
+tar -xf "${shellcheck_archive}" -C "${tmp}"
+
+# vendored shellcheck executable around?
+shellcheck="${tmp}/shellcheck-v0.11.0/shellcheck"
 if ! test -f "${shellcheck}"; then
     errln "${name}: vendored shellcheck '${shellcheck}' not found"
     exit 1
@@ -105,6 +126,7 @@ exec_for_each_find_by_name() {
     find . -name "$1" -exec "$2" {} +
 }
 exec_for_each_find_by_name '*.sh' "${shellcheck}"
+cleanup
 
 # vendored muslcc around?
 muslcc_archive="./vendor/muslcc/x86_64-linux-musl-cross.tgz"
@@ -112,17 +134,6 @@ if ! test -f "$muslcc_archive"; then
     errln "${name}: vendored muslcc archive '${muslcc_archive}' not found"
     exit 1
 fi
-
-# re-creatable tmp dir
-tmp=
-cleanup() {
-    if [ -n "$tmp" ]; then
-        rm -rf "$tmp"
-        tmp=
-    fi
-}
-trap cleanup EXIT
-trap 'cleanup; exit 130' HUP INT TERM
 
 # little combinator to make calling 'sh -c' with two args nicer
 sh_call_2() {
