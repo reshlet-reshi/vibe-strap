@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-EXPECTED = "vibe-strap\n"
+EXPECTED = "Hello World!\n"
 SHELLCHECK = ROOT / "vendor/shellcheck/x86_64-Linux/shellcheck"
 
 
@@ -26,10 +26,15 @@ def test_smoke():
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         out = tmp_path / "vibe-strap"
+        driver = tmp_path / "test.sh"
+        driver.write_text(
+            ". ./vibe-strap.sh\n"
+            ". ./hello.sh\n"
+        )
         subprocess.run(
             [
                 "sh",
-                os.fspath(ROOT / "vibe-strap.sh"),
+                os.fspath(driver),
                 os.fspath(out),
             ],
             cwd=ROOT,

@@ -2,7 +2,7 @@
 . ./std/elf/begin.sh
 
 . ./std/str/begin.sh
-emit_raw 'vibe-strap'   #   "vibe-strap"
+emit_raw 'Hello World!' #   "Hello World!"
 emit_hex 0a             #   "\n"
 . ./std/str/end.sh
 

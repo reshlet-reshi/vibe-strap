@@ -62,5 +62,3 @@ end_emit() {
     chmod +x "$out"
     exit 0
 }
-
-. ./main.sh
