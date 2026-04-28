@@ -135,11 +135,12 @@ _assemble() {
 }
 
 # test assembling source to binary,
-#  and check the output of the binary.
+#  and check the output and status of the binary.
 _test() {
     # name our args
     _test_src="$1"
-    _test_want="$2"
+    _test_want_stdout="$2"
+    _test_want_status="$3"
     
     # ensure tmp
     tmp="$(mktemp -d)"
@@ -150,14 +151,25 @@ _test() {
     
     # run assembled output and capture its output
     _test_got="${tmp}/got.txt"
-    "$_test_bin" > "$_test_got"
+    if "$_test_bin" > "$_test_got"; then
+        _test_got_status=0
+    else
+        _test_got_status="$?"
+    fi
 
     # compare actual V.S. expected
-    if ! cmp -s "$_test_want" "$_test_got"; then
+    if ! cmp -s "$_test_want_stdout" "$_test_got"; then
         errln 'wanted:'
-        cat "$_test_want" >&2
+        cat "$_test_want_stdout" >&2
         errln 'got:'
         cat "$_test_got" >&2
+        exit 1
+    fi
+    if test "$_test_want_status" != "$_test_got_status"; then
+        errln 'wanted exit status:'
+        errln "$_test_want_status"
+        errln 'got exit status:'
+        errln "$_test_got_status"
         exit 1
     fi
 
@@ -170,6 +182,8 @@ _test_dir() {
     _test_dir_base="$(basename "$_test_dir_dir")"
     _test_dir_src="${_test_dir_dir}/${_test_dir_base}.sh"
     _test_dir_stdout="${_test_dir_dir}/stdout.txt"
+    _test_dir_exit_status="${_test_dir_dir}/exit_status.txt"
+    _test_dir_want_status=0
 
     if ! test -f "$_test_dir_src"; then
         errln "${name}: test source '${_test_dir_src}' not found"
@@ -178,8 +192,11 @@ _test_dir() {
     if ! test -f "$_test_dir_stdout"; then
         _test_dir_stdout=/dev/null
     fi
+    if test -f "$_test_dir_exit_status"; then
+        _test_dir_want_status="$(sed -n '1p' "$_test_dir_exit_status")"
+    fi
 
-    _test "$_test_dir_src" "$_test_dir_stdout"
+    _test "$_test_dir_src" "$_test_dir_stdout" "$_test_dir_want_status"
 }
 
 _test_all() {
