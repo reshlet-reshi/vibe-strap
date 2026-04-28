@@ -139,7 +139,7 @@ _assemble() {
 _test() {
     # name our args
     _test_src="$1"
-    _test_want_str="$2"
+    _test_want="$2"
     
     # ensure tmp
     tmp="$(mktemp -d)"
@@ -153,8 +153,6 @@ _test() {
     "$_test_bin" > "$_test_got"
 
     # compare actual V.S. expected
-    _test_want="${tmp}/want.txt"
-    printf '%b' "$_test_want_str" > "$_test_want"
     if ! cmp -s "$_test_want" "$_test_got"; then
         errln 'wanted:'
         cat "$_test_want" >&2
@@ -168,5 +166,5 @@ _test() {
 }
 
 # actually test
-_test './hello.sh' 'Hello World!\n'
+_test './tests/hello.sh' './tests/stdout.txt'
 printf 'OK\n'
