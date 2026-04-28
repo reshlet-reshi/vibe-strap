@@ -82,59 +82,91 @@ if ! test -d "${dir}"; then
 fi
 
 # run from our dir, to avoid confusion.
-cd "${dir}" > /dev/null || exit 1
+cd "${dir}" > /dev/null
 
 # vendored shellcheck around and executable?
 shellcheck="./vendor/shellcheck/${machine}-${system}/shellcheck"
 if ! test -f "${shellcheck}"; then
-    errln "${name}: vendored shellcheck not found: ${shellcheck}"
+    errln "${name}: vendored shellcheck '${shellcheck}' not found"
     exit 1
 fi
 if ! test -x "${shellcheck}"; then
     chmod +x "${shellcheck}" || {
-        errln "${name}: vendored shellcheck not executable: ${shellcheck}"
+        errln "${name}: vendored shellcheck '${shellcheck}' not executable"
         exit 1
     }
 fi
 
-# run shell check
-find_shell_files() {
-    find . -name '*.sh'
+# run shellcheck
+exec_for_each_find_by_name() {
+    # The '{} +' line noise means: 
+    # Use find's batched exec form so each tool run receives as many matching
+    # paths as will fit in one command line, avoiding one process per file.
+    find . -name "$1" -exec "$2" {} +
 }
-find_shell_files | xargs "${shellcheck}"
+exec_for_each_find_by_name '*.sh' "${shellcheck}"
 
-# make a temp dir for output
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
-trap 'rm -rf "$tmp"; exit 130' HUP INT TERM
+# re-creatable tmp dir
+tmp=
+cleanup() {
+    if [ -n "$tmp" ]; then
+        rm -rf "$tmp"
+        tmp=
+    fi
+}
+trap cleanup EXIT
+trap 'cleanup; exit 130' HUP INT TERM
 
-# output file
-OUT="${tmp}/a.out"
+# little combinator to make calling 'sh -c' with two args nicer
+sh_call_2() {
+    sh -c "$4" "$1" "$2" "$3"
+}
 
-# write a scratch script to output the binary
-DRIVER="${tmp}/driver.sh"
-printf '. ./vibe-strap.sh\n' >> "$DRIVER"
-printf '. ./hello.sh\n' >> "$DRIVER"
+# assemble script to binary
+_assemble() {
+    _assemble_script="$1"
+    _assemble_out="$2"
 
-# invoke the driver to make OUT
-sh "$DRIVER" "$OUT"
+    # shellcheck disable=SC2016
+    sh_call_2 vibe-strap "$_assemble_out" "$_assemble_script" '
+        . ./vibe-strap.sh
+        . "$2"
+    '
+}
 
-# temp file to store executable output
-ACTUAL="${tmp}/actual.txt"
+# test assembling source to binary,
+#  and check the output of the binary.
+_test() {
+    # name our args
+    _test_src="$1"
+    _test_want_str="$2"
+    
+    # ensure tmp
+    tmp="$(mktemp -d)"
+    
+    # compile to a.out
+    _test_bin="${tmp}/a.out"
+    _assemble "$_test_src" "$_test_bin"
+    
+    # run assembled output and capture its output
+    _test_got="${tmp}/got.txt"
+    "$_test_bin" > "$_test_got"
 
-# run OUT
-"$OUT" > "$ACTUAL"
+    # compare actual V.S. expected
+    _test_want="${tmp}/want.txt"
+    printf '%b' "$_test_want_str" > "$_test_want"
+    if ! cmp -s "$_test_want" "$_test_got"; then
+        errln 'wanted:'
+        cat "$_test_want" >&2
+        errln 'got:'
+        cat "$_test_got" >&2
+        exit 1
+    fi
 
-# expected output
-EXPECTED="${tmp}/expected.txt"
-printf 'Hello World!\n' > "$EXPECTED"
+    # ditch tmp
+    cleanup
+}
 
-# check if we got what we wanted
-if ! cmp -s "$EXPECTED" "$ACTUAL"; then
-    printf 'expected:\n'
-    cat "$EXPECTED"
-    printf 'got:\n'
-    cat "$ACTUAL"
-    exit 1
-fi
-printf 'smoke test passed\n'
+# actually test
+_test './hello.sh' 'Hello World!\n'
+printf 'OK\n'
