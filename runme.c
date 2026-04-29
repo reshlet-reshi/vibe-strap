@@ -419,6 +419,32 @@ static bool expected_files_are_tracked(void) {
     return true;
 }
 
+static bool ensure_directory_exists(const char* path) {
+    // mode of 0777 mimics shell
+    if (mkdir(path, 0777) == 0)
+        return true;
+
+    int e = errno;
+    if (e != EEXIST) {
+        errln("mkdir('%s') failed: %s", path, strerror(e));
+        return false;
+    }
+
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        e = errno;
+        errln("stat('%s') failed: %s", path, strerror(e));
+        return false;
+    }
+
+    if (!S_ISDIR(st.st_mode)) {
+        errln("'%s' is not a directory", path);
+        return false;
+    }
+
+    return true;
+}
+
 int main(int argc, char** argv) {
     if (!parse_args(argc, argv))
         return EXIT_FAILURE;
@@ -452,6 +478,11 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
 
     if (!expected_files_are_tracked())
+        return EXIT_FAILURE;
+
+    if (!ensure_directory_exists("./.ignore"))
+        return EXIT_FAILURE;
+    if (!ensure_directory_exists("./.ignore/.cache"))
         return EXIT_FAILURE;
 
     puts("OK");
