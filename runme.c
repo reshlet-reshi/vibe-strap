@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -62,6 +63,47 @@ static bool check_host(void) {
     }
 
     return true;
+}
+
+static bool is_fd_open(int fd) {
+    errno = 0;
+    if (fcntl(fd, F_GETFD) >= 0)
+        return true;
+
+    return errno != EBADF;
+}
+
+static bool has_standard_fds(void) {
+    bool has_fds = true;
+
+    if (!is_fd_open(STDIN_FILENO)) {
+        errln(
+            "standard fd %s (%d) is not open",
+            "STDIN_FILENO",
+            STDIN_FILENO
+        );
+        has_fds = false;
+    }
+
+    if (!is_fd_open(STDOUT_FILENO)) {
+        errln(
+            "standard fd %s (%d) is not open",
+            "STDOUT_FILENO",
+            STDOUT_FILENO
+        );
+        has_fds = false;
+    }
+
+    if (!is_fd_open(STDERR_FILENO)) {
+        errln(
+            "standard fd %s (%d) is not open",
+            "STDERR_FILENO",
+            STDERR_FILENO
+        );
+        has_fds = false;
+    }
+
+    return has_fds;
 }
 
 static bool cd_to_self_dir(char* buffer, size_t buffer_size) {
@@ -248,6 +290,9 @@ int main(int argc, char** argv) {
     if (!parse_args(argc, argv))
         return EXIT_FAILURE;
     if (!check_host())
+        return EXIT_FAILURE;
+
+    if (!has_standard_fds())
         return EXIT_FAILURE;
 
     enum { buffer_size = 65536, };
