@@ -32,10 +32,7 @@ static int parse_args(int argc, char **argv) {
     return 0;
 }
 
-int main(int argc, char **argv) {
-    if (parse_args(argc, argv))
-        return 1;
-
+static int check_host(void) {
     struct utsname uts;
     if (uname(&uts) != 0) {
         errln("uname failed");
@@ -56,6 +53,15 @@ int main(int argc, char **argv) {
         );
         return 1;
     }
+
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    if (parse_args(argc, argv))
+        return 1;
+    if (check_host())
+        return 1;
 
     puts("OK");
     return 0;
