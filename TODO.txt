@@ -1,0 +1,2 @@
+- fork/patch the twitch caht extension to give me a little 
+  poke when someone chats
