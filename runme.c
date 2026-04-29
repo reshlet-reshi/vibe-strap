@@ -165,6 +165,85 @@ static bool same_file(const char* a, const char* b) {
     return true;
 }
 
+static bool regular_file_exists(const char* path) {
+    struct stat st;
+
+    if (stat(path, &st) != 0) {
+        int e = errno;
+        errln("stat('%s') failed: %s", path, strerror(e));
+        return false;
+    }
+
+    if (!S_ISREG(st.st_mode)) {
+        errln("'%s' is not a regular file", path);
+        return false;
+    }
+
+    return true;
+}
+
+static bool file_has_exact_content(const char* path, const char* expected) {
+    FILE* file = fopen(path, "rb");
+    if (file == NULL) {
+        int e = errno;
+        errln("fopen('%s') failed: %s", path, strerror(e));
+        return false;
+    }
+
+    for (size_t i = 0; expected[i] != '\0'; ++i) {
+        int ch = fgetc(file);
+        if (ch == EOF) {
+            if (ferror(file)) {
+                int e = errno;
+                errln("fgetc('%s') failed: %s", path, strerror(e));
+            } else {
+                errln("'%s' ended before expected content", path);
+            }
+            fclose(file);
+            return false;
+        }
+
+        if ((char)ch != expected[i]) {
+            errln("'%s' does not contain the expected content", path);
+            fclose(file);
+            return false;
+        }
+    }
+
+    int ch = fgetc(file);
+    if (ch != EOF) {
+        errln("'%s' has unexpected extra content", path);
+        fclose(file);
+        return false;
+    }
+    if (ferror(file)) {
+        int e = errno;
+        errln("fgetc('%s') failed: %s", path, strerror(e));
+        fclose(file);
+        return false;
+    }
+
+    if (fclose(file) != 0) {
+        int e = errno;
+        errln("fclose('%s') failed: %s", path, strerror(e));
+        return false;
+    }
+
+    return true;
+}
+
+static bool expected_gitignore_exists(void) {
+    static const char expected[] =
+        ".ignore/\n"
+        "runme\n"
+        ".codex\n";
+
+    if (!regular_file_exists("./.gitignore"))
+        return false;
+
+    return file_has_exact_content("./.gitignore", expected);
+}
+
 int main(int argc, char** argv) {
     if (!parse_args(argc, argv))
         return EXIT_FAILURE;
@@ -183,7 +262,14 @@ int main(int argc, char** argv) {
     if (!ok)
         return EXIT_FAILURE;
 
+    if (!regular_file_exists("./runme"))
+        return EXIT_FAILURE;
     if (!same_file("/proc/self/exe", "./runme"))
+        return EXIT_FAILURE;
+
+    if (!regular_file_exists("./runme.c"))
+        return EXIT_FAILURE;
+    if (!expected_gitignore_exists())
         return EXIT_FAILURE;
 
     puts("OK");
