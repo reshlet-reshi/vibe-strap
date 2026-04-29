@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 static const char* called_as = "runme";
@@ -286,6 +287,138 @@ static bool expected_gitignore_exists(void) {
     return file_has_exact_content("./.gitignore", expected);
 }
 
+static bool is_standard_fd(int fd) {
+    if (fd == STDIN_FILENO)
+        return true;
+    if (fd == STDOUT_FILENO)
+        return true;
+    if (fd == STDERR_FILENO)
+        return true;
+    return false;
+}
+
+static bool copy_fd_to_target(
+    const char* value,
+    int fd_value,
+    const char* target,
+    int fd_target
+) {
+    if (fd_value == fd_target)
+        return true;
+
+    if (dup2(fd_value, fd_target) < 0) {
+        int e = errno;
+        errln(
+            "dup2(%s (%d), %s (%d)) failed: %s",
+            value,
+            fd_value,
+            target,
+            fd_target,
+            strerror(e)
+        );
+        return false;
+    }
+
+    return true;
+}
+
+#define COPY_FD_TO_TARGET(value, target) copy_fd_to_target(#value, value, #target, target)
+
+static bool command_succeeds(char* const argv[]) {
+    pid_t pid = fork();
+    if (pid < 0) {
+        int e = errno;
+        errln("fork failed: %s", strerror(e));
+        return false;
+    }
+
+    if (pid == 0) {
+        if (!has_standard_fds())
+            _exit(EXIT_FAILURE);
+
+        int null_fd = open("/dev/null", O_WRONLY);
+        if (null_fd < 0) {
+            errln("failed to open '/dev/null'");
+            _exit(EXIT_FAILURE);
+        }
+
+        // NOTE this check is mostly redundant, since we
+        //  check has_standard_fds above, so null_fd >= 3
+        //  at this point. But, in esoteric multi threading/etc cases,
+        //  we could get surprised, so check anyway.
+        if (is_standard_fd(null_fd)) {
+            errln("'/dev/null' opened as standard fd");
+            _exit(EXIT_FAILURE);
+        }
+
+        if (!COPY_FD_TO_TARGET(null_fd, STDOUT_FILENO))
+            _exit(EXIT_FAILURE);
+
+        if (!COPY_FD_TO_TARGET(null_fd, STDERR_FILENO))
+            _exit(EXIT_FAILURE);
+
+        // this is safe because we know it is not a standard fd
+        close(null_fd);
+
+        execvp(argv[0], argv);
+        _exit(EXIT_FAILURE);
+    }
+
+    int status;
+    for (;;) {
+        if (waitpid(pid, &status, 0) >= 0)
+            break;
+
+        // We may get interrupted by a signal while waiting on our child.
+        // If that happens, just wait again.
+        if (errno == EINTR)
+            continue;
+
+        int e = errno;
+        errln("waitpid failed: %s", strerror(e));
+        return false;
+    }
+
+    if (WIFEXITED(status)) {
+        int code = WEXITSTATUS(status);
+        if (code == 0)
+            return true;
+
+        errln("'%s' exited with status %d", argv[0], code);
+        return false;
+    }
+
+    if (WIFSIGNALED(status)) {
+        errln("'%s' was killed by signal %d", argv[0], WTERMSIG(status));
+        return false;
+    }
+
+    errln("'%s' ended unexpectedly", argv[0]);
+    return false;
+}
+
+static bool expected_files_are_tracked(void) {
+    char* const argv[] = {
+        "git",
+        "ls-files",
+        "--error-unmatch",
+        "--",
+        "runme.c",
+        ".gitignore",
+        NULL
+    };
+
+    if (!command_succeeds(argv)) {
+        errln(
+            "could not verify runme.c and "
+            ".gitignore are tracked by git"
+        );
+        return false;
+    }
+
+    return true;
+}
+
 int main(int argc, char** argv) {
     if (!parse_args(argc, argv))
         return EXIT_FAILURE;
@@ -314,7 +447,11 @@ int main(int argc, char** argv) {
 
     if (!regular_file_exists("./runme.c"))
         return EXIT_FAILURE;
+
     if (!expected_gitignore_exists())
+        return EXIT_FAILURE;
+
+    if (!expected_files_are_tracked())
         return EXIT_FAILURE;
 
     puts("OK");
