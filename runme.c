@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 
@@ -140,6 +141,30 @@ static bool cd_to_self_dir(char* buffer, size_t buffer_size) {
     return true;
 }
 
+static bool same_file(const char* a, const char* b) {
+    struct stat a_stat;
+    struct stat b_stat;
+
+    if (stat(a, &a_stat) != 0) {
+        int e = errno;
+        errln("stat('%s') failed: %s", a, strerror(e));
+        return false;
+    }
+
+    if (stat(b, &b_stat) != 0) {
+        int e = errno;
+        errln("stat('%s') failed: %s", b, strerror(e));
+        return false;
+    }
+
+    if (a_stat.st_dev != b_stat.st_dev || a_stat.st_ino != b_stat.st_ino) {
+        errln("'%s' and '%s' are not the same file", a, b);
+        return false;
+    }
+
+    return true;
+}
+
 int main(int argc, char** argv) {
     if (!parse_args(argc, argv))
         return EXIT_FAILURE;
@@ -156,6 +181,9 @@ int main(int argc, char** argv) {
     bool ok = cd_to_self_dir(buffer, buffer_size);
     free(buffer);
     if (!ok)
+        return EXIT_FAILURE;
+
+    if (!same_file("/proc/self/exe", "./runme"))
         return EXIT_FAILURE;
 
     puts("OK");
