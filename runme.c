@@ -1,5 +1,7 @@
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/utsname.h>
 
@@ -14,10 +16,10 @@ static void errln(const char* format, ...) {
     fprintf(stderr, "\n");
 }
 
-static int parse_args(int argc, char** argv) {
+static bool parse_args(int argc, char** argv) {
     if (argc < 1 || argv[0] == NULL) {
         errln("missing argv[0]");
-        return 1;
+        return false;
     }
     name = argv[0];
 
@@ -26,17 +28,17 @@ static int parse_args(int argc, char** argv) {
             "expected no arguments, got %d",
             argc - 1
         );
-        return 1;
+        return false;
     }
 
-    return 0;
+    return true;
 }
 
-static int check_host(void) {
+static bool check_host(void) {
     struct utsname uts;
     if (uname(&uts) != 0) {
         errln("uname failed");
-        return 1;
+        return false;
     }
 
     if (strcmp(uts.machine, "x86_64") != 0) {
@@ -44,25 +46,25 @@ static int check_host(void) {
             "we only support x86_64 hosts for now, not '%s'",
             uts.machine
         );
-        return 1;
+        return false;
     }
     if (strcmp(uts.sysname, "Linux") != 0) {
         errln(
             "we only support Linux hosts for now, not '%s'",
             uts.sysname
         );
-        return 1;
+        return false;
     }
 
-    return 0;
+    return true;
 }
 
 int main(int argc, char** argv) {
-    if (parse_args(argc, argv))
-        return 1;
-    if (check_host())
-        return 1;
+    if (!parse_args(argc, argv))
+        return EXIT_FAILURE;
+    if (!check_host())
+        return EXIT_FAILURE;
 
     puts("OK");
-    return 0;
+    return EXIT_SUCCESS;
 }
