@@ -5,11 +5,12 @@
 #include <string.h>
 #include <sys/utsname.h>
 
-static const char* name = "runme";
+static const char* called_as = "runme";
+
 static void errln(const char* format, ...) {
     va_list args;
 
-    fprintf(stderr, "%s: ", name);
+    fprintf(stderr, "%s: ", called_as);
     va_start(args, format);
     vfprintf(stderr, format, args);
     va_end(args);
@@ -21,7 +22,7 @@ static bool parse_args(int argc, char** argv) {
         errln("missing argv[0]");
         return false;
     }
-    name = argv[0];
+    called_as = argv[0];
 
     if (argc != 1) {
         errln(
