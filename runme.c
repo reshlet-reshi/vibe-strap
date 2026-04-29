@@ -14,7 +14,7 @@ static void errln(const char *format, ...) {
     fprintf(stderr, "\n");
 }
 
-int main(int argc, char **argv) {
+static int parse_args(int argc, char **argv) {
     if (argc < 1 || argv[0] == NULL) {
         errln("missing argv[0]");
         return 1;
@@ -28,6 +28,13 @@ int main(int argc, char **argv) {
         );
         return 1;
     }
+
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    if (parse_args(argc, argv))
+        return 1;
 
     struct utsname uts;
     if (uname(&uts) != 0) {
