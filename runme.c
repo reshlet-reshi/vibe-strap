@@ -3,8 +3,8 @@
 #include <string.h>
 #include <sys/utsname.h>
 
-static const char *name = "runme";
-static void errln(const char *format, ...) {
+static const char* name = "runme";
+static void errln(const char* format, ...) {
     va_list args;
 
     fprintf(stderr, "%s: ", name);
@@ -14,7 +14,7 @@ static void errln(const char *format, ...) {
     fprintf(stderr, "\n");
 }
 
-static int parse_args(int argc, char **argv) {
+static int parse_args(int argc, char** argv) {
     if (argc < 1 || argv[0] == NULL) {
         errln("missing argv[0]");
         return 1;
@@ -57,7 +57,7 @@ static int check_host(void) {
     return 0;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     if (parse_args(argc, argv))
         return 1;
     if (check_host())
