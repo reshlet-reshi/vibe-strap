@@ -24,8 +24,6 @@ static enum whined parse_args_or_whine(int argc, char** argv) {
         )
     );
 
-    set_whine_name(argv[0]);
-
     RETURN_IF_WHINED(
         require(
             argc == 1,

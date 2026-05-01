@@ -8,7 +8,6 @@ enum whined {
     did_whine,
 };
 
-void set_whine_name(const char* name);
 void whine(const char* format, ...);
 enum whined require(
     bool cond,

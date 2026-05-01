@@ -3,16 +3,10 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-static const char* our_name = "runme";
-
-void set_whine_name(const char* name) {
-    our_name = name;
-}
-
 static void vwhine(const char* format, va_list args) {
-    fprintf(stderr, "%s: ", our_name);
+    fputs("runme: ", stderr);
     vfprintf(stderr, format, args);
-    fprintf(stderr, "\n");
+    fputc('\n', stderr);
 }
 
 void whine(const char* format, ...) {
