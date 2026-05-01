@@ -112,12 +112,12 @@ static enum whined whine_if_standard_fd_missing(void) {
     return whined;
 }
 
-static bool cd_to_self(char* buffer, size_t buffer_size) {
+static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
     if (buffer == NULL || buffer_size <= 1) {
         errln(
-            "internal error: invalid buffer passed to cd_to_self"
+            "internal error: invalid buffer passed to cd_to_self_or_whine"
         );
-        return false;
+        return did_whine;
     }
 
     // readlink does not null terminate,
@@ -134,7 +134,7 @@ static bool cd_to_self(char* buffer, size_t buffer_size) {
             link,
             strerror(e)
         );
-        return false;
+        return did_whine;
     }
 
     if ((size_t)length >= read_size) {
@@ -142,7 +142,7 @@ static bool cd_to_self(char* buffer, size_t buffer_size) {
             "readlink(%s) returned truncated path",
             link
         );
-        return false;
+        return did_whine;
     }
 
     if (length == 0) {
@@ -150,7 +150,7 @@ static bool cd_to_self(char* buffer, size_t buffer_size) {
             "%s resolved to an empty path",
             link
         );
-        return false;
+        return did_whine;
     }
 
     char* last_slash = &buffer[length - 1];
@@ -170,7 +170,7 @@ static bool cd_to_self(char* buffer, size_t buffer_size) {
             buffer
         );
 
-        return false;
+        return did_whine;
     }
 
     // drop the basename
@@ -183,10 +183,10 @@ static bool cd_to_self(char* buffer, size_t buffer_size) {
             buffer,
             strerror(e)
         );
-        return false;
+        return did_whine;
     }
 
-    return true;
+    return did_not_whine;
 }
 
 static bool same_file(const char* a, const char* b) {
@@ -509,9 +509,9 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    bool ok = cd_to_self(buffer, buffer_size);
+    enum whined cd_whined = cd_to_self_or_whine(buffer, buffer_size);
     free(buffer);
-    if (!ok)
+    if (cd_whined == did_whine)
         return EXIT_FAILURE;
 
     if (whine_if_not_fs_blob("./runme") == did_whine)
