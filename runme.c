@@ -112,10 +112,10 @@ static enum whined whine_if_standard_fd_missing(void) {
     return whined;
 }
 
-static bool cd_to_self_dir(char* buffer, size_t buffer_size) {
+static bool cd_to_self(char* buffer, size_t buffer_size) {
     if (buffer == NULL || buffer_size <= 1) {
         errln(
-            "internal error: invalid buffer passed to cd_to_self_dir"
+            "internal error: invalid buffer passed to cd_to_self"
         );
         return false;
     }
@@ -509,7 +509,7 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    bool ok = cd_to_self_dir(buffer, buffer_size);
+    bool ok = cd_to_self(buffer, buffer_size);
     free(buffer);
     if (!ok)
         return EXIT_FAILURE;
