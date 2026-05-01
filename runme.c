@@ -34,6 +34,7 @@ enum whined {
 
 static enum whined vrequire(
     bool cond,
+    enum whined complaint,
     const char* format,
     va_list args
 ) {
@@ -41,33 +42,38 @@ static enum whined vrequire(
         return did_not_whine;
 
     vwhine(format, args);
-    return did_whine;
+    return complaint;
 }
 
-static enum whined require(bool cond, const char* format, ...) {
+static enum whined require(
+    bool cond, 
+    enum whined complaint, 
+    const char* format, 
+    ...
+) {
     va_list args;
     va_start(args, format);
-    enum whined whined = vrequire(cond, format, args);
+    enum whined whined = vrequire(cond, complaint, format, args);
     va_end(args);
 
     return whined;
 }
 
-#define RETURN_IF_WHINED(whined, ret)   \
+#define RETURN_IF_WHINED(whined)        \
     do {                                \
-        if ((whined) == did_whine)      \
-            return (ret);               \
+        if ((whined) != did_not_whine)  \
+            return (whined);            \
     } while (0)
 
 static enum whined parse_args_or_whine(int argc, char** argv) {
     RETURN_IF_WHINED(
         require(
             (argc >= 1) && (argv[0] != NULL),
+            did_whine,
             "missing program name: argc (%d), argv[0] (%p)",
             argc,
             argv[0]
-        ),
-        did_whine
+        )
     );
 
     our_name = argv[0];
@@ -75,10 +81,10 @@ static enum whined parse_args_or_whine(int argc, char** argv) {
     RETURN_IF_WHINED(
         require(
             argc == 1,
+            did_whine,
             "expected no arguments, got %d",
             argc - 1
-        ),
-        did_whine
+        )
     );
 
     return did_not_whine;
@@ -746,8 +752,7 @@ enum whined main_check_lock_fd(
     }
 
     RETURN_IF_WHINED(
-        whine_if_wrong_text_at_fd(lock_path, lock_fd, ""),
-        did_whine
+        whine_if_wrong_text_at_fd(lock_path, lock_fd, "")
     );
 
     char* const argv[] = {
@@ -757,50 +762,44 @@ enum whined main_check_lock_fd(
 
     int exit_code;
     RETURN_IF_WHINED(
-        run_command_or_whine(argv, &exit_code), 
-        did_whine
+        run_command_or_whine(argv, &exit_code)
     );
 
     // XXX this does not distinguish all the different ways it can fail...
 
     return require(
         exit_code == EXIT_FAILURE, 
+        did_whine,
         "child process did not fail like we expected"
     );
 }
 
-#define FAIL_IF_WHINED(whined)          \
-    do {                                \
-        if ((whined) == did_whine)      \
-            return EXIT_FAILURE;        \
-    } while (0)
-
 int main(int argc, char** argv) {
-    FAIL_IF_WHINED(parse_args_or_whine(argc, argv));
-    FAIL_IF_WHINED(whine_if_host_unsupported());
-    FAIL_IF_WHINED(whine_if_standard_fd_missing());
+    RETURN_IF_WHINED(parse_args_or_whine(argc, argv));
+    RETURN_IF_WHINED(whine_if_host_unsupported());
+    RETURN_IF_WHINED(whine_if_standard_fd_missing());
 
     enum { buffer_size = 65536, };
     char* buffer = malloc(buffer_size);
-    FAIL_IF_WHINED(require(buffer, "out of memory"));
+    RETURN_IF_WHINED(require(buffer, did_whine, "out of memory"));
 
     enum whined whined;
     whined = cd_to_self_or_whine(buffer, buffer_size);
     free(buffer);
-    FAIL_IF_WHINED(whined);
+    RETURN_IF_WHINED(whined);
 
-    FAIL_IF_WHINED(whine_if_not_fs_blob_path("./runme"));
-    FAIL_IF_WHINED(
+    RETURN_IF_WHINED(whine_if_not_fs_blob_path("./runme"));
+    RETURN_IF_WHINED(
         whine_if_distinct_files(
             "/proc/self/exe",
             "./runme"
         )
     );
 
-    FAIL_IF_WHINED(whine_if_not_fs_blob_path("./runme.c"));
-    FAIL_IF_WHINED(whine_if_not_fs_blob_path("./.gitignore"));
+    RETURN_IF_WHINED(whine_if_not_fs_blob_path("./runme.c"));
+    RETURN_IF_WHINED(whine_if_not_fs_blob_path("./.gitignore"));
 
-    FAIL_IF_WHINED(
+    RETURN_IF_WHINED(
         whine_if_wrong_text_at_path(
             "./.gitignore",
 
@@ -810,14 +809,14 @@ int main(int argc, char** argv) {
         )
     );
 
-    FAIL_IF_WHINED(whine_if_file_untracked("runme.c"));
-    FAIL_IF_WHINED(whine_if_file_untracked(".gitignore"));
+    RETURN_IF_WHINED(whine_if_file_untracked("runme.c"));
+    RETURN_IF_WHINED(whine_if_file_untracked(".gitignore"));
 
-    FAIL_IF_WHINED(mkdir_or_whine("./.ignore"));
+    RETURN_IF_WHINED(mkdir_or_whine("./.ignore"));
 
     const char* lock_path = "./.ignore/runme.lock";
     int lock_fd;
-    FAIL_IF_WHINED(open_blob_or_whine(lock_path, &lock_fd));
+    RETURN_IF_WHINED(open_blob_or_whine(lock_path, &lock_fd));
 
     whined = main_check_lock_fd(lock_path, lock_fd);
 
@@ -827,7 +826,7 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    FAIL_IF_WHINED(whined);
+    RETURN_IF_WHINED(whined);
 
     puts("OK");
     return EXIT_SUCCESS;
