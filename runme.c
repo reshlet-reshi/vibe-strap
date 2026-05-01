@@ -457,21 +457,20 @@ static enum whined whine_if_command_fails(char* const argv[]) {
     return did_whine;
 }
 
-static bool expected_files_are_tracked(void) {
+static bool is_file_tracked(char* path) {
     char* const argv[] = {
         "git",
         "ls-files",
         "--error-unmatch",
         "--",
-        "runme.c",
-        ".gitignore",
-        NULL 
+        path,
+        NULL
     };
 
     if (whine_if_command_fails(argv) == did_whine) {
         whine(
-            "could not verify runme.c and "
-            ".gitignore are tracked by git"
+            "could not verify '%s' is tracked by git",
+            path
         );
         return false;
     }
@@ -537,7 +536,9 @@ int main(int argc, char** argv) {
     if (whine_if_wrong_gitignore() == did_whine)
         return EXIT_FAILURE;
 
-    if (!expected_files_are_tracked())
+    if (!is_file_tracked("runme.c"))
+        return EXIT_FAILURE;
+    if (!is_file_tracked(".gitignore"))
         return EXIT_FAILURE;
 
     if (!ensure_directory_exists("./.ignore"))
