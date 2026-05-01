@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
 #include <fcntl.h>
@@ -259,7 +260,6 @@ static enum whined whine_if_distinct_files(
 enum fs_blob_status {
     fs_blob_0,
 
-    fs_blob_null_path,
     fs_blob_null_error_pointer,
 
     fs_blob_exists,
@@ -286,29 +286,18 @@ static enum fs_blob_status fs_blob_status(
     return fs_blob_exists;
 }
 
-static enum fs_blob_status fs_blob_path_status(
+static enum whined whine_if_not_fs_blob(
     const char* path,
-    int* p_error
+    int fd
 ) {
-    if (!path)
-        return fs_blob_null_path;
-
-    if (!p_error)
-        return fs_blob_null_error_pointer;
-
-    struct stat st;
-    if (stat(path, &st) != 0) {
-        *p_error = errno;
-        return fs_blob_stat_error;
+    if (!path) {
+        whine(
+            "internal error: "
+            "null path passed to whine_if_not_fs_blob"
+        );
+        return did_whine;
     }
 
-    if (!S_ISREG(st.st_mode))
-        return fs_blob_wrong_mode;
-
-    return fs_blob_exists;
-}
-
-static enum whined whine_if_not_fs_blob(int fd) {
     int error;
     enum fs_blob_status blob_stat;
     blob_stat = fs_blob_status(fd, &error);
@@ -318,14 +307,14 @@ static enum whined whine_if_not_fs_blob(int fd) {
 
     if (blob_stat == fs_blob_stat_error) {
         whine(
-            "fstat(%d) failed: %s",
-            fd,
+            "fstat('%s') failed: %s",
+            path,
             strerror(error)
         );
     } else if (blob_stat == fs_blob_wrong_mode) {
         whine(
-            "fd %d is not a regular file",
-            fd
+            "'%s' is not a regular file",
+            path
         );
     } else {
         whine(
@@ -347,33 +336,22 @@ static enum whined whine_if_not_fs_blob_path(const char* path) {
         return did_whine;
     }
 
-    int error;
-    enum fs_blob_status blob_stat;
-    blob_stat = fs_blob_path_status(path, &error);
-
-    if (blob_stat == fs_blob_exists)
-        return did_not_whine;
-
-    if (blob_stat == fs_blob_stat_error) {
-        whine(
-            "stat('%s') failed: %s",
-            path,
-            strerror(error)
-        );
-    } else if (blob_stat == fs_blob_wrong_mode) {
-        whine(
-            "'%s' is not a regular file",
-            path
-        );
-    } else {
-        whine(
-            "internal error: unexpected fs_blob_status '%d'.\n"
-            "from: whine_if_not_fs_blob_path",
-            blob_stat
-        );
+    int fd = open(path, O_PATH | O_CLOEXEC);
+    if (fd < 0) {
+        int e = errno;
+        whine("open('%s') failed: %s", path, strerror(e));
+        return did_whine;
     }
 
-    return did_whine;
+    enum whined whined = whine_if_not_fs_blob(path, fd);
+
+    if (close(fd) != 0) {
+        int e = errno;
+        whine("close('%s') failed: %s", path, strerror(e));
+        return did_whine;
+    }
+
+    return whined;
 }
 
 static enum whined whine_if_wrong_text_at_fd(
@@ -723,7 +701,7 @@ static enum whined open_blob_or_whine(
         }
     }
 
-    if (whine_if_not_fs_blob(fd) == did_whine)
+    if (whine_if_not_fs_blob(path, fd) == did_whine)
     {
         if (close(fd) != 0) {
             int e = errno;
