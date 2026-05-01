@@ -39,6 +39,8 @@ struct result {
     struct {
         const char* path;
         int fd;
+        int flags;
+        mode_t mode;
         size_t buffer_size;
     } in;
 
@@ -249,6 +251,34 @@ static enum whined whine_results(
             sizeof(const struct result*)                         \
     )
 
+static void sys_open(
+    const char* path,
+    int flags,
+    mode_t mode,
+    struct result* result
+) {
+    clear_result(result);
+    result->in.path = path;
+    result->in.flags = flags;
+    result->in.mode = mode;
+
+    bool needs_mode =
+        ((result->in.flags & O_CREAT) == O_CREAT) ||
+        ((result->in.flags & O_TMPFILE) == O_TMPFILE);
+
+    if (needs_mode)
+        result->out.fd = open(path, result->in.flags, result->in.mode);
+    else
+        result->out.fd = open(path, result->in.flags);
+
+    if (result->out.fd < 0) {
+        result->out.status = s_open_failed;
+        result->out.sys_error = errno;
+    }
+
+    errno = 0;
+}
+
 static void is_fd_open(
     const char* path,
     int fd,
@@ -359,19 +389,6 @@ static void is_fd_regular_file(
     errno = 0;
 }
 
-static void open_path_fd(const char* path, struct result* result) {
-    clear_result(result);
-    result->in.path = path;
-    result->out.fd = open(path, O_PATH | O_CLOEXEC);
-
-    if (result->out.fd < 0) {
-        result->out.status = s_open_failed;
-        result->out.sys_error = errno;
-    }
-
-    errno = 0;
-}
-
 static void is_path_regular_file(
     const char* path,
     struct result* result,
@@ -387,7 +404,7 @@ static void is_path_regular_file(
         return;
     }
 
-    open_path_fd(path, result);
+    sys_open(path, O_PATH | O_CLOEXEC, 0, result);
     if (result->out.status != s_ok)
         return;
 
@@ -497,14 +514,11 @@ static void has_expected_text_at_path(
     clear_result(close_result);
     close_result->in.path = path;
 
-    int fd = open(path, O_RDONLY | O_CLOEXEC);
-    int e = errno;
-    if (fd < 0) {
-        result->out.status = s_open_failed;
-        result->out.sys_error = e;
-        errno = 0;
+    sys_open(path, O_RDONLY | O_CLOEXEC, 0, result);
+    if (result->out.status != s_ok)
         return;
-    }
+
+    int fd = result->out.fd;
 
     has_expected_text_at_fd(
         path,
@@ -514,7 +528,7 @@ static void has_expected_text_at_path(
     );
 
     int status = close(fd);
-    e = errno;
+    int e = errno;
     if (status != 0) {
         close_result->in.fd = fd;
         close_result->out.status = s_close_failed;
@@ -607,14 +621,12 @@ static enum whined run_command_or_whine(
         if (whined == did_whine)
             _exit(whined);
 
-        int null_fd = open("/dev/null", O_WRONLY);
-        whined = require(
-            null_fd >= 0,
-            did_whine,
-            "failed to open '/dev/null'"
-        );
+        sys_open("/dev/null", O_WRONLY | O_CLOEXEC, 0, &result);
+        whined = whine_result(result);
         if (whined == did_whine)
             _exit(whined);
+
+        int null_fd = result.out.fd;
 
         // NOTE this check is mostly redundant, since we
         //  checked the standard fds above, so null_fd >= 3 at
@@ -772,41 +784,28 @@ static enum whined open_blob_or_whine(
         )
     );
 
-    // mode of 0666 mimics shell
-    int fd = open(path, O_CREAT | O_EXCL | O_RDWR | O_CLOEXEC, 0666);
-    int e = errno;
-    if (fd < 0) {
-        RETURN_IF_WHINED(
-            require(
-                e == EEXIST,
-                did_whine,
-                "open('%s') failed: %s",
-                path,
-                strerror(e)
-            )
-        );
-    }
-
-    if (fd < 0) {
-        fd = open(path, O_RDWR | O_CLOEXEC | O_NOFOLLOW);
-        e = errno;
-        RETURN_IF_WHINED(
-            require(
-                fd >= 0,
-                did_whine,
-                "open('%s') failed: %s",
-                path,
-                strerror(e)
-            )
-        );
-    }
-
     struct result result;
+
+    // mode of 0666 mimics shell
+    sys_open(path, O_CREAT | O_EXCL | O_RDWR | O_CLOEXEC, 0666, &result);
+    if (result.out.status != s_ok) {
+        if (
+            result.out.status != s_open_failed ||
+            result.out.sys_error != EEXIST
+        ) {
+            RETURN_IF_WHINED(whine_result(result));
+        }
+
+        sys_open(path, O_RDWR | O_CLOEXEC | O_NOFOLLOW, 0, &result);
+        RETURN_IF_WHINED(whine_result(result));
+    }
+
+    int fd = result.out.fd;
     is_fd_regular_file(path, fd, &result);
     enum whined whined = whine_result(result);
     if (whined == did_whine) {
         int status = close(fd);
-        e = errno;
+        int e = errno;
         require(
             status == 0,
             did_whine,

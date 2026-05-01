@@ -1,4 +1,6 @@
 
+- sys_open : fix create/mode (want to only pass mode if create)
+
 - whined -> exit_status
 
 - fork/patch the twitch caht extension to give me a little 
