@@ -743,7 +743,28 @@ enum whined main_check_lock_fd(
         return did_whine;
     }
 
-    return whine_if_wrong_text_at_fd(lock_path, lock_fd, "");
+    RETURN_IF_WHINED(
+        whine_if_wrong_text_at_fd(lock_path, lock_fd, ""),
+        did_whine
+    );
+
+    char* const argv[] = {
+        "./runme",
+        NULL
+    };
+
+    int exit_code;
+    RETURN_IF_WHINED(
+        run_command_or_whine(argv, &exit_code), 
+        did_whine
+    );
+
+    // XXX this does not distinguish all the different ways it can fail...
+
+    return whine_if(
+        exit_code != EXIT_FAILURE, 
+        "child process did not fail like we expected"
+    );
 }
 
 #define FAIL_IF_WHINED(whined)          \
