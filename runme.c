@@ -4,7 +4,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -182,20 +181,26 @@ static enum whined whine_result(struct result result) {
     );
 }
 
-static enum whined whine_results(const struct result* result, ...) {
+static enum whined whine_results(
+    const struct result* const results[],
+    size_t count
+) {
     enum whined whined = did_not_whine;
 
-    va_list args;
-    va_start(args, result);
-    while (result != NULL) {
-        if (whine_result(*result) == did_whine)
+    for (size_t i = 0; i < count; ++i) {
+        if (whine_result(*results[i]) == did_whine)
             whined = did_whine;
-        result = va_arg(args, const struct result*);
     }
-    va_end(args);
 
     return whined;
 }
+
+#define WHINE_RESULTS(...)                                      \
+    whine_results(                                              \
+        (const struct result* const[]) { __VA_ARGS__ },          \
+        sizeof((const struct result* const[]) { __VA_ARGS__ }) / \
+            sizeof(const struct result*)                         \
+    )
 
 static void is_fd_open(
     const char* path,
@@ -895,7 +900,7 @@ int main(int argc, char** argv) {
     struct result path_result;
     struct result close_result;
     is_path_regular_file("./runme", &path_result, &close_result);
-    RETURN_IF_WHINED(whine_results(&path_result, &close_result, NULL));
+    RETURN_IF_WHINED(WHINE_RESULTS(&path_result, &close_result));
     {
         const char* a = "/proc/self/exe";
         const char* b = "./runme";
@@ -939,10 +944,10 @@ int main(int argc, char** argv) {
     }
 
     is_path_regular_file("./runme.c", &path_result, &close_result);
-    RETURN_IF_WHINED(whine_results(&path_result, &close_result, NULL));
+    RETURN_IF_WHINED(WHINE_RESULTS(&path_result, &close_result));
 
     is_path_regular_file("./.gitignore", &path_result, &close_result);
-    RETURN_IF_WHINED(whine_results(&path_result, &close_result, NULL));
+    RETURN_IF_WHINED(WHINE_RESULTS(&path_result, &close_result));
 
     RETURN_IF_WHINED(
         whine_if_wrong_text_at_path(
