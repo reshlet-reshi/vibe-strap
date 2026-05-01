@@ -522,15 +522,15 @@ static enum whined dup2_or_whine(
 #define DUP2_OR_WHINE(value, target) \
     dup2_or_whine(#value, (value), #target, (target))
 
-static void die(void) {
-    _exit(EXIT_FAILURE);
+static void die(enum whined complaint) {
+    _exit(complaint);
 }
 
 static void die_if_whined(enum whined whined) {
     if (whined != did_whine)
         return;
 
-    die();
+    die(whined);
 }
 
 static enum whined run_command_or_whine(
@@ -558,7 +558,7 @@ static enum whined run_command_or_whine(
         int null_fd = open("/dev/null", O_WRONLY);
         if (null_fd < 0) {
             whine("failed to open '/dev/null'");
-            die();
+            die(did_whine);
         }
 
         // NOTE this check is mostly redundant, since we
@@ -567,7 +567,7 @@ static enum whined run_command_or_whine(
         //  we could get surprised, so check anyway.
         if (is_standard_fd(null_fd)) {
             whine("'/dev/null' opened as standard fd");
-            die();
+            die(did_whine);
         }
 
         die_if_whined(DUP2_OR_WHINE(null_fd, STDOUT_FILENO));
@@ -579,7 +579,7 @@ static enum whined run_command_or_whine(
         execvp(argv[0], argv);
 
         // if we get here execvp failed
-        die();
+        die(did_whine);
     }
 
     int status;
@@ -823,11 +823,11 @@ int main(int argc, char** argv) {
     if (close(lock_fd) != 0) {
         int e = errno;
         whine("close('%s') failed: %s", lock_path, strerror(e));
-        return EXIT_FAILURE;
+        return did_whine;
     }
 
     RETURN_IF_WHINED(whined);
 
     puts("OK");
-    return EXIT_SUCCESS;
+    return did_not_whine;
 }
