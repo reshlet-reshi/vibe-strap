@@ -374,6 +374,11 @@ static void die(void) {
     _exit(EXIT_FAILURE);
 }
 
+static void die_on_whine(enum whined whined) {
+    if (whined == did_whine)
+        die();
+}
+
 static enum whined whine_if_command_fails(char* const argv[]) {
     pid_t pid = fork();
     if (pid < 0) {
@@ -383,8 +388,7 @@ static enum whined whine_if_command_fails(char* const argv[]) {
     }
 
     if (pid == 0) {
-        if (whine_if_standard_fd_missing() == did_whine)
-            die();
+        die_on_whine(whine_if_standard_fd_missing());
 
         int null_fd = open("/dev/null", O_WRONLY);
         if (null_fd < 0) {
@@ -401,11 +405,8 @@ static enum whined whine_if_command_fails(char* const argv[]) {
             die();
         }
 
-        if (COPY_FD_TO_TARGET_OR_WHINE(null_fd, STDOUT_FILENO) == did_whine)
-            die();
-
-        if (COPY_FD_TO_TARGET_OR_WHINE(null_fd, STDERR_FILENO) == did_whine)
-            die();
+        die_on_whine(COPY_FD_TO_TARGET_OR_WHINE(null_fd, STDOUT_FILENO));
+        die_on_whine(COPY_FD_TO_TARGET_OR_WHINE(null_fd, STDERR_FILENO));
 
         // this is safe because we know it is not a standard fd
         close(null_fd);
