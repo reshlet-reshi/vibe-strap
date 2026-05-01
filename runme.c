@@ -13,7 +13,7 @@
 
 static const char* our_name = "runme";
 
-static void errln(const char* format, ...) {
+static void whine(const char* format, ...) {
     va_list args;
 
     fprintf(stderr, "%s: ", our_name);
@@ -30,13 +30,13 @@ enum whined {
 
 static enum whined parse_args_or_whine(int argc, char** argv) {
     if (argc < 1 || argv[0] == NULL) {
-        errln("missing program name");
+        whine("missing program name");
         return did_whine;
     }
     our_name = argv[0];
 
     if (argc != 1) {
-        errln(
+        whine(
             "expected no arguments, got %d",
             argc - 1
         );
@@ -49,19 +49,19 @@ static enum whined parse_args_or_whine(int argc, char** argv) {
 static enum whined whine_if_host_unsupported(void) {
     struct utsname uts;
     if (uname(&uts) != 0) {
-        errln("uname failed");
+        whine("uname failed");
         return did_whine;
     }
 
     if (strcmp(uts.machine, "x86_64") != 0) {
-        errln(
+        whine(
             "we only support x86_64 hosts for now, not '%s'",
             uts.machine
         );
         return did_whine;
     }
     if (strcmp(uts.sysname, "Linux") != 0) {
-        errln(
+        whine(
             "we only support Linux hosts for now, not '%s'",
             uts.sysname
         );
@@ -83,7 +83,7 @@ static enum whined whine_if_standard_fd_missing(void) {
     enum whined whined = did_not_whine;
 
     if (!is_fd_open(STDIN_FILENO)) {
-        errln(
+        whine(
             "standard fd %s (%d) is not open",
             "STDIN_FILENO",
             STDIN_FILENO
@@ -92,7 +92,7 @@ static enum whined whine_if_standard_fd_missing(void) {
     }
 
     if (!is_fd_open(STDOUT_FILENO)) {
-        errln(
+        whine(
             "standard fd %s (%d) is not open",
             "STDOUT_FILENO",
             STDOUT_FILENO
@@ -101,7 +101,7 @@ static enum whined whine_if_standard_fd_missing(void) {
     }
 
     if (!is_fd_open(STDERR_FILENO)) {
-        errln(
+        whine(
             "standard fd %s (%d) is not open",
             "STDERR_FILENO",
             STDERR_FILENO
@@ -114,7 +114,7 @@ static enum whined whine_if_standard_fd_missing(void) {
 
 static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
     if (buffer == NULL || buffer_size <= 1) {
-        errln(
+        whine(
             "internal error: invalid buffer passed to cd_to_self_or_whine"
         );
         return did_whine;
@@ -129,7 +129,7 @@ static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
 
     if (length < 0) {
         int e = errno;
-        errln(
+        whine(
             "readlink(%s) failed: %s",
             link,
             strerror(e)
@@ -138,7 +138,7 @@ static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
     }
 
     if ((size_t)length >= read_size) {
-        errln(
+        whine(
             "readlink(%s) returned truncated path",
             link
         );
@@ -146,7 +146,7 @@ static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
     }
 
     if (length == 0) {
-        errln(
+        whine(
             "%s resolved to an empty path",
             link
         );
@@ -161,10 +161,10 @@ static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
     }
 
     if (*last_slash != '/') {
-        // null terminate for errln
+        // null terminate for whine
         buffer[length] = '\0';
 
-        errln(
+        whine(
             "%s path has no directory component: '%s'",
             link,
             buffer
@@ -178,7 +178,7 @@ static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
 
     if (chdir(buffer) != 0) {
         int e = errno;
-        errln(
+        whine(
             "chdir('%s') failed: %s",
             buffer,
             strerror(e)
@@ -195,18 +195,18 @@ static enum whined whine_if_distinct_files(const char* a, const char* b) {
 
     if (stat(a, &a_stat) != 0) {
         int e = errno;
-        errln("stat('%s') failed: %s", a, strerror(e));
+        whine("stat('%s') failed: %s", a, strerror(e));
         return did_whine;
     }
 
     if (stat(b, &b_stat) != 0) {
         int e = errno;
-        errln("stat('%s') failed: %s", b, strerror(e));
+        whine("stat('%s') failed: %s", b, strerror(e));
         return did_whine;
     }
 
     if (a_stat.st_dev != b_stat.st_dev || a_stat.st_ino != b_stat.st_ino) {
-        errln("'%s' and '%s' are not the same file", a, b);
+        whine("'%s' and '%s' are not the same file", a, b);
         return did_whine;
     }
 
@@ -248,7 +248,7 @@ static enum fs_blob_status fs_blob_status(
 
 static enum whined whine_if_not_fs_blob(const char* path) {
     if (!path) {
-        errln("internal error: null path passed to whine_if_not_fs_blob");
+        whine("internal error: null path passed to whine_if_not_fs_blob");
         return did_whine;
     }
 
@@ -259,11 +259,11 @@ static enum whined whine_if_not_fs_blob(const char* path) {
         return did_not_whine;
 
     if (stat == fs_blob_stat_error) {
-        errln("stat('%s') failed: %s", path, strerror(error));
+        whine("stat('%s') failed: %s", path, strerror(error));
     } else if (stat == fs_blob_wrong_mode) {
-        errln("'%s' is not a regular file", path);
+        whine("'%s' is not a regular file", path);
     } else {
-        errln(
+        whine(
             "internal error: unexpected fs_blob_status '%d'.\n"
             "from: whine_if_not_fs_blob",
             stat
@@ -277,7 +277,7 @@ static bool file_has_exact_content(const char* path, const char* expected) {
     FILE* file = fopen(path, "rb");
     if (file == NULL) {
         int e = errno;
-        errln("fopen('%s') failed: %s", path, strerror(e));
+        whine("fopen('%s') failed: %s", path, strerror(e));
         return false;
     }
 
@@ -286,16 +286,16 @@ static bool file_has_exact_content(const char* path, const char* expected) {
         if (ch == EOF) {
             if (ferror(file)) {
                 int e = errno;
-                errln("fgetc('%s') failed: %s", path, strerror(e));
+                whine("fgetc('%s') failed: %s", path, strerror(e));
             } else {
-                errln("'%s' ended before expected content", path);
+                whine("'%s' ended before expected content", path);
             }
             fclose(file);
             return false;
         }
 
         if ((char)ch != expected[i]) {
-            errln("'%s' does not contain the expected content", path);
+            whine("'%s' does not contain the expected content", path);
             fclose(file);
             return false;
         }
@@ -303,20 +303,20 @@ static bool file_has_exact_content(const char* path, const char* expected) {
 
     int ch = fgetc(file);
     if (ch != EOF) {
-        errln("'%s' has unexpected extra content", path);
+        whine("'%s' has unexpected extra content", path);
         fclose(file);
         return false;
     }
     if (ferror(file)) {
         int e = errno;
-        errln("fgetc('%s') failed: %s", path, strerror(e));
+        whine("fgetc('%s') failed: %s", path, strerror(e));
         fclose(file);
         return false;
     }
 
     if (fclose(file) != 0) {
         int e = errno;
-        errln("fclose('%s') failed: %s", path, strerror(e));
+        whine("fclose('%s') failed: %s", path, strerror(e));
         return false;
     }
 
@@ -356,7 +356,7 @@ static bool copy_fd_to_target(
 
     if (dup2(fd_value, fd_target) < 0) {
         int e = errno;
-        errln(
+        whine(
             "dup2(%s (%d), %s (%d)) failed: %s",
             value,
             fd_value,
@@ -376,7 +376,7 @@ static bool command_succeeds(char* const argv[]) {
     pid_t pid = fork();
     if (pid < 0) {
         int e = errno;
-        errln("fork failed: %s", strerror(e));
+        whine("fork failed: %s", strerror(e));
         return false;
     }
 
@@ -386,7 +386,7 @@ static bool command_succeeds(char* const argv[]) {
 
         int null_fd = open("/dev/null", O_WRONLY);
         if (null_fd < 0) {
-            errln("failed to open '/dev/null'");
+            whine("failed to open '/dev/null'");
             _exit(EXIT_FAILURE);
         }
 
@@ -395,7 +395,7 @@ static bool command_succeeds(char* const argv[]) {
         //  at this point. But, in esoteric multi threading/etc cases,
         //  we could get surprised, so check anyway.
         if (is_standard_fd(null_fd)) {
-            errln("'/dev/null' opened as standard fd");
+            whine("'/dev/null' opened as standard fd");
             _exit(EXIT_FAILURE);
         }
 
@@ -425,7 +425,7 @@ static bool command_succeeds(char* const argv[]) {
             continue;
 
         int e = errno;
-        errln("waitpid failed: %s", strerror(e));
+        whine("waitpid failed: %s", strerror(e));
         return false;
     }
 
@@ -434,16 +434,16 @@ static bool command_succeeds(char* const argv[]) {
         if (code == 0)
             return true;
 
-        errln("'%s' exited with status %d", argv[0], code);
+        whine("'%s' exited with status %d", argv[0], code);
         return false;
     }
 
     if (WIFSIGNALED(status)) {
-        errln("'%s' was killed by signal %d", argv[0], WTERMSIG(status));
+        whine("'%s' was killed by signal %d", argv[0], WTERMSIG(status));
         return false;
     }
 
-    errln("'%s' ended unexpectedly", argv[0]);
+    whine("'%s' ended unexpectedly", argv[0]);
     return false;
 }
 
@@ -459,7 +459,7 @@ static bool expected_files_are_tracked(void) {
     };
 
     if (!command_succeeds(argv)) {
-        errln(
+        whine(
             "could not verify runme.c and "
             ".gitignore are tracked by git"
         );
@@ -476,19 +476,19 @@ static bool ensure_directory_exists(const char* path) {
 
     int e = errno;
     if (e != EEXIST) {
-        errln("mkdir('%s') failed: %s", path, strerror(e));
+        whine("mkdir('%s') failed: %s", path, strerror(e));
         return false;
     }
 
     struct stat st;
     if (stat(path, &st) != 0) {
         e = errno;
-        errln("stat('%s') failed: %s", path, strerror(e));
+        whine("stat('%s') failed: %s", path, strerror(e));
         return false;
     }
 
     if (!S_ISDIR(st.st_mode)) {
-        errln("'%s' is not a directory", path);
+        whine("'%s' is not a directory", path);
         return false;
     }
 
@@ -507,7 +507,7 @@ int main(int argc, char** argv) {
     enum { buffer_size = 65536, };
     char* buffer = malloc(buffer_size);
     if (!buffer) {
-        errln("out of memory");
+        whine("out of memory");
         return EXIT_FAILURE;
     }
 
