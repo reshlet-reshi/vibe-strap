@@ -268,6 +268,25 @@ enum fs_blob_status {
 };
 
 static enum fs_blob_status fs_blob_status(
+    int fd,
+    int* p_error
+) {
+    if (!p_error)
+        return fs_blob_null_error_pointer;
+
+    struct stat st;
+    if (fstat(fd, &st) != 0) {
+        *p_error = errno;
+        return fs_blob_stat_error;
+    }
+
+    if (!S_ISREG(st.st_mode))
+        return fs_blob_wrong_mode;
+
+    return fs_blob_exists;
+}
+
+static enum fs_blob_status fs_blob_path_status(
     const char* path,
     int* p_error
 ) {
@@ -289,18 +308,48 @@ static enum fs_blob_status fs_blob_status(
     return fs_blob_exists;
 }
 
-static enum whined whine_if_not_fs_blob(const char* path) {
+static enum whined whine_if_not_fs_blob(int fd) {
+    int error;
+    enum fs_blob_status blob_stat;
+    blob_stat = fs_blob_status(fd, &error);
+
+    if (blob_stat == fs_blob_exists)
+        return did_not_whine;
+
+    if (blob_stat == fs_blob_stat_error) {
+        whine(
+            "fstat(%d) failed: %s",
+            fd,
+            strerror(error)
+        );
+    } else if (blob_stat == fs_blob_wrong_mode) {
+        whine(
+            "fd %d is not a regular file",
+            fd
+        );
+    } else {
+        whine(
+            "internal error: unexpected fs_blob_status '%d'.\n"
+            "from: whine_if_not_fs_blob",
+            blob_stat
+        );
+    }
+
+    return did_whine;
+}
+
+static enum whined whine_if_not_fs_blob_path(const char* path) {
     if (!path) {
         whine(
             "internal error: "
-            "null path passed to whine_if_not_fs_blob"
+            "null path passed to whine_if_not_fs_blob_path"
         );
         return did_whine;
     }
 
     int error;
     enum fs_blob_status blob_stat;
-    blob_stat = fs_blob_status(path, &error);
+    blob_stat = fs_blob_path_status(path, &error);
 
     if (blob_stat == fs_blob_exists)
         return did_not_whine;
@@ -319,7 +368,7 @@ static enum whined whine_if_not_fs_blob(const char* path) {
     } else {
         whine(
             "internal error: unexpected fs_blob_status '%d'.\n"
-            "from: whine_if_not_fs_blob",
+            "from: whine_if_not_fs_blob_path",
             blob_stat
         );
     }
@@ -327,53 +376,86 @@ static enum whined whine_if_not_fs_blob(const char* path) {
     return did_whine;
 }
 
-static enum whined whine_if_wrong_text_in_file(
+static enum whined whine_if_wrong_text_at_fd(
     const char* path,
-    FILE* file,
+    int fd,
     const char* expected
 ) {
-    for (size_t i = 0; expected[i] != '\0'; ++i) {
-        int ch = fgetc(file);
-        if (ch == EOF) {
-            if (ferror(file)) {
-                int e = errno;
-                whine(
-                    "fgetc('%s') failed: %s",
-                    path,
-                    strerror(e)
-                );
-            } else {
-                whine(
-                    "'%s' ended before expected content",
-                    path
-                );
-            }
+    enum { buffer_size = 4096, };
+    char buffer[buffer_size];
+
+    if (lseek(fd, 0, SEEK_SET) == (off_t)-1) {
+        int e = errno;
+        whine(
+            "lseek('%s') failed: %s",
+            path,
+            strerror(e)
+        );
+        return did_whine;
+    }
+
+    size_t offset = 0;
+    size_t expected_length = strlen(expected);
+    while (offset < expected_length) {
+        size_t remaining = expected_length - offset;
+        size_t chunk_size = remaining < sizeof(buffer)
+            ? remaining
+            : sizeof(buffer);
+
+        ssize_t n = read(fd, buffer, chunk_size);
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+
+            int e = errno;
+            whine(
+                "read('%s') failed: %s",
+                path,
+                strerror(e)
+            );
             return did_whine;
         }
 
-        if ((char)ch != expected[i]) {
+        if (n == 0) {
+            whine(
+                "'%s' ended before expected content",
+                path
+            );
+            return did_whine;
+        }
+
+        if (memcmp(buffer, expected + offset, (size_t)n) != 0) {
             whine(
                 "'%s' does not contain the expected content",
                 path
             );
             return did_whine;
         }
+
+        offset += (size_t)n;
     }
 
-    int ch = fgetc(file);
-    if (ch != EOF) {
+    for (;;) {
+        ssize_t n = read(fd, buffer, sizeof(buffer));
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+
+            int e = errno;
+            whine(
+                "read('%s') failed: %s",
+                path,
+                strerror(e)
+            );
+            return did_whine;
+        }
+
+        if (n == 0)
+            break;
+
         whine(
             "'%s' has unexpected extra content",
             path
-        );
-        return did_whine;
-    }
-    if (ferror(file)) {
-        int e = errno;
-        whine(
-            "fgetc('%s') failed: %s",
-            path,
-            strerror(e)
         );
         return did_whine;
     }
@@ -385,11 +467,11 @@ static enum whined whine_if_wrong_text_at_path(
     const char* path,
     const char* expected
 ) {
-    FILE* file = fopen(path, "rb");
-    if (file == NULL) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
         int e = errno;
         whine(
-            "fopen('%s') failed: %s",
+            "open('%s') failed: %s",
             path,
             strerror(e)
         );
@@ -397,16 +479,16 @@ static enum whined whine_if_wrong_text_at_path(
     }
 
     enum whined whined;
-    whined = whine_if_wrong_text_in_file(
+    whined = whine_if_wrong_text_at_fd(
         path,
-        file,
+        fd,
         expected
     );
 
-    if (fclose(file) != 0) {
+    if (close(fd) != 0) {
         int e = errno;
         whine(
-            "fclose('%s') failed: %s",
+            "close('%s') failed: %s",
             path,
             strerror(e)
         );
@@ -602,6 +684,68 @@ static enum whined mkdir_or_whine(const char* path) {
     return did_not_whine;
 }
 
+static enum whined open_blob_or_whine(
+    const char* path,
+    int* p_fd
+) {
+    if (!path) {
+        whine(
+            "internal error: "
+            "null path passed to open_blob_or_whine"
+        );
+        return did_whine;
+    }
+
+    if (!p_fd) {
+        whine(
+            "internal error: "
+            "null p_fd passed to open_blob_or_whine"
+        );
+        return did_whine;
+    }
+
+    // mode of 0666 mimics shell
+    int fd = open(path, O_CREAT | O_EXCL | O_RDWR | O_CLOEXEC, 0666);
+    if (fd < 0) {
+        int e = errno;
+        if (e != EEXIST) {
+            whine("open('%s') failed: %s", path, strerror(e));
+            return did_whine;
+        }
+    }
+
+    if (fd < 0) {
+        fd = open(path, O_RDWR | O_CLOEXEC | O_NOFOLLOW);
+        if (fd < 0) {
+            int e = errno;
+            whine("open('%s') failed: %s", path, strerror(e));
+            return did_whine;
+        }
+    }
+
+    if (whine_if_not_fs_blob(fd) == did_whine)
+    {
+        if (close(fd) != 0) {
+            int e = errno;
+            whine("close('%s') failed: %s", path, strerror(e));
+        }
+        return did_whine;
+    }
+
+    *p_fd = fd;
+    return did_not_whine;
+}
+
+enum whined main_check_lock_fd(
+    const char* lock_path,
+    int lock_fd
+) {
+    // TODO LATER
+    // actualy try to lock the fd
+
+    return whine_if_wrong_text_at_fd(lock_path, lock_fd, "");
+}
+
 #define FAIL_IF_WHINED(whined)          \
     do {                                \
         if ((whined) == did_whine)      \
@@ -622,7 +766,7 @@ int main(int argc, char** argv) {
     free(buffer);
     FAIL_IF_WHINED(whined);
 
-    FAIL_IF_WHINED(whine_if_not_fs_blob("./runme"));
+    FAIL_IF_WHINED(whine_if_not_fs_blob_path("./runme"));
     FAIL_IF_WHINED(
         whine_if_distinct_files(
             "/proc/self/exe",
@@ -630,8 +774,8 @@ int main(int argc, char** argv) {
         )
     );
 
-    FAIL_IF_WHINED(whine_if_not_fs_blob("./runme.c"));
-    FAIL_IF_WHINED(whine_if_not_fs_blob("./.gitignore"));
+    FAIL_IF_WHINED(whine_if_not_fs_blob_path("./runme.c"));
+    FAIL_IF_WHINED(whine_if_not_fs_blob_path("./.gitignore"));
 
     FAIL_IF_WHINED(
         whine_if_wrong_text_at_path(
@@ -647,7 +791,20 @@ int main(int argc, char** argv) {
     FAIL_IF_WHINED(whine_if_file_untracked(".gitignore"));
 
     FAIL_IF_WHINED(mkdir_or_whine("./.ignore"));
-    FAIL_IF_WHINED(mkdir_or_whine("./.ignore/.cache"));
+
+    const char* lock_path = "./.ignore/runme.lock";
+    int lock_fd;
+    FAIL_IF_WHINED(open_blob_or_whine(lock_path, &lock_fd));
+
+    whined = main_check_lock_fd(lock_path, lock_fd);
+
+    if (close(lock_fd) != 0) {
+        int e = errno;
+        whine("close('%s') failed: %s", lock_path, strerror(e));
+        return EXIT_FAILURE;
+    }
+
+    FAIL_IF_WHINED(whined);
 
     puts("OK");
     return EXIT_SUCCESS;
