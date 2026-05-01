@@ -13,13 +13,9 @@
 
 static const char* our_name = "runme";
 
-static void whine(const char* format, ...) {
-    va_list args;
-
+static void vwhine(const char* format, va_list args) {
     fprintf(stderr, "%s: ", our_name);
-    va_start(args, format);
     vfprintf(stderr, format, args);
-    va_end(args);
     fprintf(stderr, "\n");
 }
 
@@ -28,20 +24,49 @@ enum whined {
     did_whine,
 };
 
+static enum whined vwhine_if(bool cond, const char* format, va_list args) {
+    if (!cond)
+        return did_not_whine;
+
+    vwhine(format, args);
+    return did_whine;
+}
+
+static void whine(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    vwhine_if(true, format, args);
+    va_end(args);
+}
+
+static enum whined whine_if(bool cond, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    enum whined whined = vwhine_if(cond, format, args);
+    va_end(args);
+
+    return whined;
+}
+
+#define RETURN_IF_WHINED(whined) if (whined == did_whine) return whined;
+
 static enum whined parse_args_or_whine(int argc, char** argv) {
-    if (argc < 1 || argv[0] == NULL) {
-        whine("missing program name");
-        return did_whine;
-    }
+    RETURN_IF_WHINED(
+        whine_if(
+            argc < 1 || argv[0] == NULL, 
+            "missing program name"
+        )
+    )
+    
     our_name = argv[0];
 
-    if (argc != 1) {
-        whine(
+    RETURN_IF_WHINED(
+        whine_if(
+            argc != 1,
             "expected no arguments, got %d",
             argc - 1
-        );
-        return did_whine;
-    }
+        )
+    )
 
     return did_not_whine;
 }
