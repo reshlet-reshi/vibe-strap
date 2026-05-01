@@ -208,21 +208,69 @@ static bool same_file(const char* a, const char* b) {
     return true;
 }
 
-static bool regular_file_exists(const char* path) {
+enum fs_blob_status {
+    fs_blob_0,
+
+    fs_blob_null_path,
+    fs_blob_null_error_pointer,
+
+    fs_blob_exists,
+    fs_blob_stat_error,
+    fs_blob_wrong_mode,
+};
+
+static enum fs_blob_status fs_blob_status(
+    const char* path,
+    int* p_error
+) {
+    if (!path)
+        return fs_blob_null_path;
+
+    if (!p_error)
+        return fs_blob_null_error_pointer;
+
     struct stat st;
-
     if (stat(path, &st) != 0) {
-        int e = errno;
-        errln("stat('%s') failed: %s", path, strerror(e));
-        return false;
+        *p_error = errno;
+        return fs_blob_stat_error;
     }
 
-    if (!S_ISREG(st.st_mode)) {
+    if (!S_ISREG(st.st_mode))
+        return fs_blob_wrong_mode;
+
+    return fs_blob_exists;
+}
+
+enum whined {
+    did_not_whine,
+    whined,
+};
+
+static enum whined whine_if_not_fs_blob(const char* path) {
+    if (!path) {
+        errln("internal error: null path passed to whine_if_not_fs_blob");
+        return whined;
+    }
+
+    int error;
+    enum fs_blob_status stat = fs_blob_status(path, &error);
+
+    if (stat == fs_blob_exists)
+        return did_not_whine;
+
+    if (stat == fs_blob_stat_error) {
+        errln("stat('%s') failed: %s", path, strerror(error));
+    } else if (stat == fs_blob_wrong_mode) {
         errln("'%s' is not a regular file", path);
-        return false;
+    } else {
+        errln(
+            "internal error: unexpected fs_blob_status '%d'.\n"
+            "from: whine_if_not_fs_blob",
+            stat
+        );
     }
 
-    return true;
+    return whined;
 }
 
 static bool file_has_exact_content(const char* path, const char* expected) {
@@ -281,7 +329,7 @@ static bool expected_gitignore_exists(void) {
         "runme\n"
         ".codex\n";
 
-    if (!regular_file_exists("./.gitignore"))
+    if (whine_if_not_fs_blob("./.gitignore") == whined)
         return false;
 
     return file_has_exact_content("./.gitignore", expected);
@@ -466,12 +514,12 @@ int main(int argc, char** argv) {
     if (!ok)
         return EXIT_FAILURE;
 
-    if (!regular_file_exists("./runme"))
+    if (whine_if_not_fs_blob("./runme") == whined)
         return EXIT_FAILURE;
     if (!same_file("/proc/self/exe", "./runme"))
         return EXIT_FAILURE;
 
-    if (!regular_file_exists("./runme.c"))
+    if (whine_if_not_fs_blob("./runme.c") == whined)
         return EXIT_FAILURE;
 
     if (!expected_gitignore_exists())
