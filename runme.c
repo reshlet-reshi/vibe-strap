@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,7 +49,11 @@ struct result {
     } out;
 };
 
-enum { is_path_regular_file_result_count = 2 };
+static void clear_result(struct result* result) {
+    *result = (struct result) {0};
+    result->in.fd = -1;
+    result->out.fd = -1;
+}
 
 static enum whined whine_result(struct result result) {
     switch (result.out.status) {
@@ -177,14 +182,17 @@ static enum whined whine_result(struct result result) {
     );
 }
 
-static enum whined whine_results(
-    const struct result (*results)[is_path_regular_file_result_count]
-) {
+static enum whined whine_results(const struct result* result, ...) {
     enum whined whined = did_not_whine;
-    for (size_t i = 0; i < is_path_regular_file_result_count; ++i) {
-        if (whine_result((*results)[i]) == did_whine)
+
+    va_list args;
+    va_start(args, result);
+    while (result != NULL) {
+        if (whine_result(*result) == did_whine)
             whined = did_whine;
+        result = va_arg(args, const struct result*);
     }
+    va_end(args);
 
     return whined;
 }
@@ -194,10 +202,9 @@ static void is_fd_open(
     int fd,
     struct result* result
 ) {
-    *result = (struct result) {0};
+    clear_result(result);
     result->in.path = path;
     result->in.fd = fd;
-    result->out.fd = -1;
 
     errno = 0;
     if (fcntl(fd, F_GETFD) >= 0)
@@ -217,11 +224,10 @@ static void cd_to_self(
     size_t buffer_size,
     struct result* result
 ) {
-    *result = (struct result) {0};
+    clear_result(result);
     result->in.path = "/proc/self/exe";
     result->in.buffer_size = buffer_size;
     result->in_out.buffer = buffer;
-    result->out.fd = -1;
 
     if (buffer == NULL || buffer_size <= 1) {
         result->out.status = s_invalid_buffer;
@@ -286,10 +292,9 @@ static void is_fd_regular_file(
     int fd,
     struct result* result
 ) {
-    *result = (struct result) {0};
+    clear_result(result);
     result->in.path = path;
     result->in.fd = fd;
-    result->out.fd = -1;
 
     struct stat st;
     if (fstat(fd, &st) < 0) {
@@ -303,9 +308,8 @@ static void is_fd_regular_file(
 }
 
 static void open_path_fd(const char* path, struct result* result) {
-    *result = (struct result) {0};
+    clear_result(result);
     result->in.path = path;
-    result->in.fd = -1;
     result->out.fd = open(path, O_PATH | O_CLOEXEC);
 
     if (result->out.fd < 0) {
@@ -318,37 +322,34 @@ static void open_path_fd(const char* path, struct result* result) {
 
 static void is_path_regular_file(
     const char* path,
-    struct result (*results)[is_path_regular_file_result_count]
+    struct result* result,
+    struct result* close_result
 ) {
-    (*results)[0] = (struct result) {0};
-    (*results)[0].in.path = path;
-    (*results)[0].in.fd = -1;
-    (*results)[0].out.fd = -1;
-    (*results)[1] = (struct result) {0};
-    (*results)[1].in.path = path;
-    (*results)[1].in.fd = -1;
-    (*results)[1].out.fd = -1;
+    clear_result(result);
+    result->in.path = path;
+    clear_result(close_result);
+    close_result->in.path = path;
 
     if (path == NULL) {
-        (*results)[0].out.status = s_null_path;
+        result->out.status = s_null_path;
         return;
     }
 
-    open_path_fd(path, &(*results)[0]);
-    if ((*results)[0].out.status != s_ok)
+    open_path_fd(path, result);
+    if (result->out.status != s_ok)
         return;
 
-    int fd = (*results)[0].out.fd;
-    is_fd_regular_file(path, fd, &(*results)[0]);
+    int fd = result->out.fd;
+    is_fd_regular_file(path, fd, result);
 
     int status = close(fd);
     int e = errno;
     if (status != 0) {
-        (*results)[1].in.path = path;
-        (*results)[1].in.fd = fd;
-        (*results)[1].out.fd = -1;
-        (*results)[1].out.status = s_close_failed;
-        (*results)[1].out.sys_error = e;
+        clear_result(close_result);
+        close_result->in.path = path;
+        close_result->in.fd = fd;
+        close_result->out.status = s_close_failed;
+        close_result->out.sys_error = e;
     }
 
     errno = 0;
@@ -891,9 +892,10 @@ int main(int argc, char** argv) {
     free(buffer);
     RETURN_IF_WHINED(whined);
 
-    struct result path_results[is_path_regular_file_result_count];
-    is_path_regular_file("./runme", &path_results);
-    RETURN_IF_WHINED(whine_results(&path_results));
+    struct result path_result;
+    struct result close_result;
+    is_path_regular_file("./runme", &path_result, &close_result);
+    RETURN_IF_WHINED(whine_results(&path_result, &close_result, NULL));
     {
         const char* a = "/proc/self/exe";
         const char* b = "./runme";
@@ -936,11 +938,11 @@ int main(int argc, char** argv) {
         );
     }
 
-    is_path_regular_file("./runme.c", &path_results);
-    RETURN_IF_WHINED(whine_results(&path_results));
+    is_path_regular_file("./runme.c", &path_result, &close_result);
+    RETURN_IF_WHINED(whine_results(&path_result, &close_result, NULL));
 
-    is_path_regular_file("./.gitignore", &path_results);
-    RETURN_IF_WHINED(whine_results(&path_results));
+    is_path_regular_file("./.gitignore", &path_result, &close_result);
+    RETURN_IF_WHINED(whine_results(&path_result, &close_result, NULL));
 
     RETURN_IF_WHINED(
         whine_if_wrong_text_at_path(
