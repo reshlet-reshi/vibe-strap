@@ -272,14 +272,11 @@ static enum whined whine_if_not_fs_blob(const char* path) {
     return did_whine;
 }
 
-static enum whined whine_if_wrong_text_at_path(const char* path, const char* expected) {
-    FILE* file = fopen(path, "rb");
-    if (file == NULL) {
-        int e = errno;
-        whine("fopen('%s') failed: %s", path, strerror(e));
-        return did_whine;
-    }
-
+static enum whined whine_if_wrong_text_in_file(
+    const char* path, 
+    FILE* file, 
+    const char* expected
+) {
     for (size_t i = 0; expected[i] != '\0'; ++i) {
         int ch = fgetc(file);
         if (ch == EOF) {
@@ -289,13 +286,11 @@ static enum whined whine_if_wrong_text_at_path(const char* path, const char* exp
             } else {
                 whine("'%s' ended before expected content", path);
             }
-            fclose(file);
             return did_whine;
         }
 
         if ((char)ch != expected[i]) {
             whine("'%s' does not contain the expected content", path);
-            fclose(file);
             return did_whine;
         }
     }
@@ -303,15 +298,30 @@ static enum whined whine_if_wrong_text_at_path(const char* path, const char* exp
     int ch = fgetc(file);
     if (ch != EOF) {
         whine("'%s' has unexpected extra content", path);
-        fclose(file);
         return did_whine;
     }
     if (ferror(file)) {
         int e = errno;
         whine("fgetc('%s') failed: %s", path, strerror(e));
-        fclose(file);
         return did_whine;
     }
+
+    return did_not_whine;
+}
+
+static enum whined whine_if_wrong_text_at_path(const char* path, const char* expected) {
+    FILE* file = fopen(path, "rb");
+    if (file == NULL) {
+        int e = errno;
+        whine("fopen('%s') failed: %s", path, strerror(e));
+        return did_whine;
+    }
+
+    enum whined whined = whine_if_wrong_text_in_file(
+        path,
+        file,
+        expected
+    );
 
     if (fclose(file) != 0) {
         int e = errno;
@@ -319,7 +329,7 @@ static enum whined whine_if_wrong_text_at_path(const char* path, const char* exp
         return did_whine;
     }
 
-    return did_not_whine;
+    return whined;
 }
 
 static bool whine_if_wrong_gitignore(void) {
