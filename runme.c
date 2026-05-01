@@ -25,13 +25,13 @@ static void errln(const char* format, ...) {
 
 enum whined {
     did_not_whine,
-    whined,
+    did_whine,
 };
 
 static enum whined parse_args_or_whine(int argc, char** argv) {
     if (argc < 1 || argv[0] == NULL) {
         errln("missing program name");
-        return whined;
+        return did_whine;
     }
     called_as = argv[0];
 
@@ -40,7 +40,7 @@ static enum whined parse_args_or_whine(int argc, char** argv) {
             "expected no arguments, got %d",
             argc - 1
         );
-        return whined;
+        return did_whine;
     }
 
     return did_not_whine;
@@ -50,7 +50,7 @@ static enum whined whine_if_host_unsupported(void) {
     struct utsname uts;
     if (uname(&uts) != 0) {
         errln("uname failed");
-        return whined;
+        return did_whine;
     }
 
     if (strcmp(uts.machine, "x86_64") != 0) {
@@ -58,14 +58,14 @@ static enum whined whine_if_host_unsupported(void) {
             "we only support x86_64 hosts for now, not '%s'",
             uts.machine
         );
-        return whined;
+        return did_whine;
     }
     if (strcmp(uts.sysname, "Linux") != 0) {
         errln(
             "we only support Linux hosts for now, not '%s'",
             uts.sysname
         );
-        return whined;
+        return did_whine;
     }
 
     return did_not_whine;
@@ -79,8 +79,8 @@ static bool is_fd_open(int fd) {
     return errno != EBADF;
 }
 
-static bool has_standard_fds(void) {
-    bool has_fds = true;
+static enum whined whine_if_standard_fd_missing(void) {
+    enum whined whined = did_not_whine;
 
     if (!is_fd_open(STDIN_FILENO)) {
         errln(
@@ -88,7 +88,7 @@ static bool has_standard_fds(void) {
             "STDIN_FILENO",
             STDIN_FILENO
         );
-        has_fds = false;
+        whined = did_whine;
     }
 
     if (!is_fd_open(STDOUT_FILENO)) {
@@ -97,7 +97,7 @@ static bool has_standard_fds(void) {
             "STDOUT_FILENO",
             STDOUT_FILENO
         );
-        has_fds = false;
+        whined = did_whine;
     }
 
     if (!is_fd_open(STDERR_FILENO)) {
@@ -106,10 +106,10 @@ static bool has_standard_fds(void) {
             "STDERR_FILENO",
             STDERR_FILENO
         );
-        has_fds = false;
+        whined = did_whine;
     }
 
-    return has_fds;
+    return whined;
 }
 
 static bool cd_to_self_dir(char* buffer, size_t buffer_size) {
@@ -249,7 +249,7 @@ static enum fs_blob_status fs_blob_status(
 static enum whined whine_if_not_fs_blob(const char* path) {
     if (!path) {
         errln("internal error: null path passed to whine_if_not_fs_blob");
-        return whined;
+        return did_whine;
     }
 
     int error;
@@ -270,7 +270,7 @@ static enum whined whine_if_not_fs_blob(const char* path) {
         );
     }
 
-    return whined;
+    return did_whine;
 }
 
 static bool file_has_exact_content(const char* path, const char* expected) {
@@ -329,7 +329,7 @@ static bool expected_gitignore_exists(void) {
         "runme\n"
         ".codex\n";
 
-    if (whine_if_not_fs_blob("./.gitignore") == whined)
+    if (whine_if_not_fs_blob("./.gitignore") == did_whine)
         return false;
 
     return file_has_exact_content("./.gitignore", expected);
@@ -381,7 +381,7 @@ static bool command_succeeds(char* const argv[]) {
     }
 
     if (pid == 0) {
-        if (!has_standard_fds())
+        if (whine_if_standard_fd_missing() == did_whine)
             _exit(EXIT_FAILURE);
 
         int null_fd = open("/dev/null", O_WRONLY);
@@ -391,7 +391,7 @@ static bool command_succeeds(char* const argv[]) {
         }
 
         // NOTE this check is mostly redundant, since we
-        //  check has_standard_fds above, so null_fd >= 3
+        //  whine_if_standard_fd_missing above, so null_fd >= 3
         //  at this point. But, in esoteric multi threading/etc cases,
         //  we could get surprised, so check anyway.
         if (is_standard_fd(null_fd)) {
@@ -494,12 +494,12 @@ static bool ensure_directory_exists(const char* path) {
 }
 
 int main(int argc, char** argv) {
-    if (parse_args_or_whine(argc, argv) == whined)
+    if (parse_args_or_whine(argc, argv) == did_whine)
         return EXIT_FAILURE;
-    if (whine_if_host_unsupported() == whined)
+    if (whine_if_host_unsupported() == did_whine)
         return EXIT_FAILURE;
 
-    if (!has_standard_fds())
+    if (whine_if_standard_fd_missing() == did_whine)
         return EXIT_FAILURE;
 
     enum { buffer_size = 65536, };
@@ -514,12 +514,12 @@ int main(int argc, char** argv) {
     if (!ok)
         return EXIT_FAILURE;
 
-    if (whine_if_not_fs_blob("./runme") == whined)
+    if (whine_if_not_fs_blob("./runme") == did_whine)
         return EXIT_FAILURE;
     if (!same_file("/proc/self/exe", "./runme"))
         return EXIT_FAILURE;
 
-    if (whine_if_not_fs_blob("./runme.c") == whined)
+    if (whine_if_not_fs_blob("./runme.c") == did_whine)
         return EXIT_FAILURE;
 
     if (!expected_gitignore_exists())
