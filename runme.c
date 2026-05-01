@@ -332,18 +332,6 @@ static enum whined whine_if_wrong_text_at_path(const char* path, const char* exp
     return whined;
 }
 
-static bool whine_if_wrong_gitignore(void) {
-    static const char expected[] =
-        ".ignore/\n"
-        "runme\n"
-        ".codex\n";
-
-    if (whine_if_not_fs_blob("./.gitignore") == did_whine)
-        return did_whine;
-
-    return whine_if_wrong_text_at_path("./.gitignore", expected);
-}
-
 static bool is_standard_fd(int fd) {
     if (fd == STDIN_FILENO)
         return true;
@@ -532,8 +520,19 @@ int main(int argc, char** argv) {
 
     if (whine_if_not_fs_blob("./runme.c") == did_whine)
         return EXIT_FAILURE;
+    if (whine_if_not_fs_blob("./.gitignore") == did_whine)
+        return did_whine;
 
-    if (whine_if_wrong_gitignore() == did_whine)
+    static const char expected_gitignore[] =
+        ".ignore/\n"
+        "runme\n"
+        ".codex\n";
+
+    enum whined gitignore_whined = whine_if_wrong_text_at_path(
+        "./.gitignore", 
+        expected_gitignore
+    );
+    if (gitignore_whined == did_whine)
         return EXIT_FAILURE;
 
     if (!is_file_tracked("runme.c"))
