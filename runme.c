@@ -13,43 +13,118 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static bool is_fd_open(int fd) {
+enum {
+    s_ok,
+    s_open_failed,
+    s_fcntl_failed,
+    s_fd_not_open,
+    s_fstat_failed,
+    s_not_regular_file,
+};
+
+struct result {
+    struct {
+        const char* path;
+        int fd;
+    } in;
+
+    struct {
+        int status;
+        int sys_error;
+        int fd;
+    } out;
+};
+
+static enum whined whine_result(struct result result) {
+    switch (result.out.status) {
+    case s_ok:
+        return did_not_whine;
+
+    case s_open_failed:
+        return require(
+            false,
+            did_whine,
+            "open('%s') failed: %s",
+            result.in.path,
+            strerror(result.out.sys_error)
+        );
+
+    case s_fcntl_failed:
+        return require(
+            false,
+            did_whine,
+            "fcntl(%s (%d), F_GETFD) failed: %s",
+            result.in.path,
+            result.in.fd,
+            strerror(result.out.sys_error)
+        );
+
+    case s_fd_not_open:
+        return require(
+            false,
+            did_whine,
+            "standard fd %s (%d) is not open",
+            result.in.path,
+            result.in.fd
+        );
+
+    case s_fstat_failed:
+        return require(
+            false,
+            did_whine,
+            "fstat('%s') failed: %s",
+            result.in.path,
+            strerror(result.out.sys_error)
+        );
+
+    case s_not_regular_file:
+        return require(
+            false,
+            did_whine,
+            "'%s' is not a regular file",
+            result.in.path
+        );
+    }
+
+    return require(
+        false,
+        did_whine,
+        "internal error: unknown result status %d",
+        result.out.status
+    );
+}
+
+static struct result is_fd_open(const char* path, int fd) {
+    struct result result = {0};
+    result.in.path = path;
+    result.in.fd = fd;
+    result.out.fd = -1;
+
     errno = 0;
     if (fcntl(fd, F_GETFD) >= 0)
-        return true;
+        result.out.status = s_ok;
+    else if (errno == EBADF)
+        result.out.status = s_fd_not_open;
+    else {
+        result.out.status = s_fcntl_failed;
+        result.out.sys_error = errno;
+    }
 
-    return errno != EBADF;
+    errno = 0;
+    return result;
 }
 
 static enum whined whine_if_standard_fd_missing(void) {
     RETURN_IF_WHINED(
-        require(
-            is_fd_open(STDIN_FILENO),
-            did_whine,
-            "standard fd %s (%d) is not open",
-            "STDIN_FILENO",
-            STDIN_FILENO
-        )
+        whine_result(is_fd_open("STDIN_FILENO", STDIN_FILENO))
     );
 
     RETURN_IF_WHINED(
-        require(
-            is_fd_open(STDOUT_FILENO),
-            did_whine,
-            "standard fd %s (%d) is not open",
-            "STDOUT_FILENO",
-            STDOUT_FILENO
-        )
+        whine_result(is_fd_open("STDOUT_FILENO", STDOUT_FILENO))
     );
 
     RETURN_IF_WHINED(
-        require(
-            is_fd_open(STDERR_FILENO),
-            did_whine,
-            "standard fd %s (%d) is not open",
-            "STDERR_FILENO",
-            STDERR_FILENO
-        )
+        whine_result(is_fd_open("STDERR_FILENO", STDERR_FILENO))
     );
 
     return did_not_whine;
@@ -140,66 +215,6 @@ static enum whined cd_to_self_or_whine(
     );
 
     return did_not_whine;
-}
-
-enum {
-    s_ok,
-    s_open_failed,
-    s_fstat_failed,
-    s_not_regular_file,
-};
-
-struct result {
-    struct {
-        const char* path;
-        int fd;
-    } in;
-
-    struct {
-        int status;
-        int sys_error;
-        int fd;
-    } out;
-};
-
-static enum whined whine_result(struct result result) {
-    switch (result.out.status) {
-    case s_ok:
-        return did_not_whine;
-
-    case s_open_failed:
-        return require(
-            false,
-            did_whine,
-            "open('%s') failed: %s",
-            result.in.path,
-            strerror(result.out.sys_error)
-        );
-
-    case s_fstat_failed:
-        return require(
-            false,
-            did_whine,
-            "fstat('%s') failed: %s",
-            result.in.path,
-            strerror(result.out.sys_error)
-        );
-
-    case s_not_regular_file:
-        return require(
-            false,
-            did_whine,
-            "'%s' is not a regular file",
-            result.in.path
-        );
-    }
-
-    return require(
-        false,
-        did_whine,
-        "internal error: unknown result status %d",
-        result.out.status
-    );
 }
 
 static struct result is_fd_regular_file(const char* path, int fd) {
