@@ -142,50 +142,6 @@ static enum whined cd_to_self_or_whine(
     return did_not_whine;
 }
 
-static enum whined whine_if_distinct_files(
-    const char* a,
-    const char* b
-) {
-    struct stat a_stat;
-    int status = stat(a, &a_stat);
-    int e = errno;
-    RETURN_IF_WHINED(
-        require(
-            status == 0,
-            did_whine,
-            "stat('%s') failed: %s", 
-            a, 
-            strerror(e)
-        )
-    );
-
-    struct stat b_stat;
-    status = stat(b, &b_stat);
-    e = errno;
-    RETURN_IF_WHINED(
-        require(
-            status == 0,
-            did_whine,
-            "stat('%s') failed: %s", 
-            b, 
-            strerror(e)
-        )
-    );
-
-    RETURN_IF_WHINED(
-        require(
-            a_stat.st_dev == b_stat.st_dev &&
-            a_stat.st_ino == b_stat.st_ino,
-            did_whine,
-            "'%s' and '%s' are not the same file", 
-            a, 
-            b
-        )
-    );
-
-    return did_not_whine;
-}
-
 static enum whined whine_if_not_fs_blob(
     const char* path,
     int fd
@@ -782,12 +738,47 @@ int main(int argc, char** argv) {
     RETURN_IF_WHINED(whined);
 
     RETURN_IF_WHINED(whine_if_not_fs_blob_path("./runme"));
-    RETURN_IF_WHINED(
-        whine_if_distinct_files(
-            "/proc/self/exe",
-            "./runme"
-        )
-    );
+    {
+        const char* a = "/proc/self/exe";
+        const char* b = "./runme";
+
+        struct stat a_stat;
+        int status = stat(a, &a_stat);
+        int e = errno;
+        RETURN_IF_WHINED(
+            require(
+                status == 0,
+                did_whine,
+                "stat('%s') failed: %s",
+                a,
+                strerror(e)
+            )
+        );
+
+        struct stat b_stat;
+        status = stat(b, &b_stat);
+        e = errno;
+        RETURN_IF_WHINED(
+            require(
+                status == 0,
+                did_whine,
+                "stat('%s') failed: %s",
+                b,
+                strerror(e)
+            )
+        );
+
+        RETURN_IF_WHINED(
+            require(
+                a_stat.st_dev == b_stat.st_dev &&
+                a_stat.st_ino == b_stat.st_ino,
+                did_whine,
+                "'%s' and '%s' are not the same file",
+                a,
+                b
+            )
+        );
+    }
 
     RETURN_IF_WHINED(whine_if_not_fs_blob_path("./runme.c"));
     RETURN_IF_WHINED(whine_if_not_fs_blob_path("./.gitignore"));
