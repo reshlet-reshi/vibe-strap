@@ -48,14 +48,17 @@ static enum whined whine_if(bool cond, const char* format, ...) {
     return whined;
 }
 
-#define RETURN_IF_WHINED(whined) if (whined == did_whine) return whined;
+#define RETURN_IF_WHINED(whined, ret)   \
+    if (whined == did_whine)            \
+        return ret;
 
 static enum whined parse_args_or_whine(int argc, char** argv) {
     RETURN_IF_WHINED(
         whine_if(
             argc < 1 || argv[0] == NULL, 
             "missing program name"
-        )
+        ),
+        did_whine
     )
     
     our_name = argv[0];
@@ -65,7 +68,8 @@ static enum whined parse_args_or_whine(int argc, char** argv) {
             argc != 1,
             "expected no arguments, got %d",
             argc - 1
-        )
+        ),
+        did_whine
     )
 
     return did_not_whine;
