@@ -382,12 +382,12 @@ static enum whined copy_fd_to_target_or_whine(
 #define COPY_FD_TO_TARGET_OR_WHINE(value, target) \
     copy_fd_to_target_or_whine(#value, value, #target, target)
 
-static bool command_succeeds(char* const argv[]) {
+static enum whined whine_if_command_fails(char* const argv[]) {
     pid_t pid = fork();
     if (pid < 0) {
         int e = errno;
         whine("fork failed: %s", strerror(e));
-        return false;
+        return did_whine;
     }
 
     if (pid == 0) {
@@ -436,25 +436,25 @@ static bool command_succeeds(char* const argv[]) {
 
         int e = errno;
         whine("waitpid failed: %s", strerror(e));
-        return false;
+        return did_whine;
     }
 
     if (WIFEXITED(status)) {
         int code = WEXITSTATUS(status);
         if (code == 0)
-            return true;
+            return did_not_whine;
 
         whine("'%s' exited with status %d", argv[0], code);
-        return false;
+        return did_whine;
     }
 
     if (WIFSIGNALED(status)) {
         whine("'%s' was killed by signal %d", argv[0], WTERMSIG(status));
-        return false;
+        return did_whine;
     }
 
     whine("'%s' ended unexpectedly", argv[0]);
-    return false;
+    return did_whine;
 }
 
 static bool expected_files_are_tracked(void) {
@@ -465,10 +465,10 @@ static bool expected_files_are_tracked(void) {
         "--",
         "runme.c",
         ".gitignore",
-        NULL
+        NULL 
     };
 
-    if (!command_succeeds(argv)) {
+    if (whine_if_command_fails(argv) == did_whine) {
         whine(
             "could not verify runme.c and "
             ".gitignore are tracked by git"
