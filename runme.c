@@ -486,44 +486,42 @@ static void has_expected_text_at_fd(
     errno = 0;
 }
 
-static enum whined whine_if_wrong_text_at_path(
+static void has_expected_text_at_path(
     const char* path,
-    const char* expected
+    const char* expected,
+    struct result* result,
+    struct result* close_result
 ) {
+    clear_result(result);
+    result->in.path = path;
+    clear_result(close_result);
+    close_result->in.path = path;
+
     int fd = open(path, O_RDONLY | O_CLOEXEC);
     int e = errno;
-    RETURN_IF_WHINED(
-        require(
-            fd >= 0,
-            did_whine,
-            "open('%s') failed: %s",
-            path,
-            strerror(e)
-        )
-    );
+    if (fd < 0) {
+        result->out.status = s_open_failed;
+        result->out.sys_error = e;
+        errno = 0;
+        return;
+    }
 
-    struct result result;
     has_expected_text_at_fd(
         path,
         fd,
         expected,
-        &result
+        result
     );
 
     int status = close(fd);
     e = errno;
-    enum whined whined = whine_result(result);
-    RETURN_IF_WHINED(
-        require(
-            status == 0,
-            did_whine,
-            "close('%s') failed: %s",
-            path,
-            strerror(e)
-        )
-    );
+    if (status != 0) {
+        close_result->in.fd = fd;
+        close_result->out.status = s_close_failed;
+        close_result->out.sys_error = e;
+    }
 
-    return whined;
+    errno = 0;
 }
 
 static bool is_standard_fd(int fd) {
@@ -986,15 +984,17 @@ int main(int argc, char** argv) {
     is_path_regular_file("./.gitignore", &path_result, &close_result);
     RETURN_IF_WHINED(WHINE_RESULTS(&path_result, &close_result));
 
-    RETURN_IF_WHINED(
-        whine_if_wrong_text_at_path(
-            "./.gitignore",
+    has_expected_text_at_path(
+        "./.gitignore",
 
-            ".ignore/\n"
-            "runme\n"
-            ".codex\n"
-        )
+        ".ignore/\n"
+        "runme\n"
+        ".codex\n",
+
+        &path_result,
+        &close_result
     );
+    RETURN_IF_WHINED(WHINE_RESULTS(&path_result, &close_result));
 
     RETURN_IF_WHINED(whine_if_file_untracked("runme.c"));
     RETURN_IF_WHINED(whine_if_file_untracked(".gitignore"));
