@@ -564,17 +564,6 @@ static enum whined dup2_or_whine(
 #define DUP2_OR_WHINE(value, target) \
     dup2_or_whine(#value, (value), #target, (target))
 
-static void die(enum whined complaint) {
-    _exit(complaint);
-}
-
-static void die_if_whined(enum whined whined) {
-    if (whined != did_whine)
-        return;
-
-    die(whined);
-}
-
 static enum whined run_command_or_whine(
     char* const argv[],
     int* p_exit_code
@@ -601,38 +590,51 @@ static enum whined run_command_or_whine(
 
     if (pid == 0) {
         struct result result;
+        enum whined whined;
+
         is_fd_open("STDIN_FILENO", STDIN_FILENO, &result);
-        die_if_whined(whine_result(result));
+        whined = whine_result(result);
+        if (whined == did_whine)
+            _exit(whined);
 
         is_fd_open("STDOUT_FILENO", STDOUT_FILENO, &result);
-        die_if_whined(whine_result(result));
+        whined = whine_result(result);
+        if (whined == did_whine)
+            _exit(whined);
 
         is_fd_open("STDERR_FILENO", STDERR_FILENO, &result);
-        die_if_whined(whine_result(result));
+        whined = whine_result(result);
+        if (whined == did_whine)
+            _exit(whined);
 
         int null_fd = open("/dev/null", O_WRONLY);
-        die_if_whined(
-            require(
-                null_fd >= 0,
-                did_whine,
-                "failed to open '/dev/null'"
-            )
+        whined = require(
+            null_fd >= 0,
+            did_whine,
+            "failed to open '/dev/null'"
         );
+        if (whined == did_whine)
+            _exit(whined);
 
         // NOTE this check is mostly redundant, since we
         //  checked the standard fds above, so null_fd >= 3 at
         //  this point. But, in esoteric threaded cases,
         //  we could get surprised, so check anyway.
-        die_if_whined(
-            require(
-                is_standard_fd(null_fd) == false,
-                did_whine,
-                "'/dev/null' opened as standard fd"
-            )
+        whined = require(
+            is_standard_fd(null_fd) == false,
+            did_whine,
+            "'/dev/null' opened as standard fd"
         );
+        if (whined == did_whine)
+            _exit(whined);
 
-        die_if_whined(DUP2_OR_WHINE(null_fd, STDOUT_FILENO));
-        die_if_whined(DUP2_OR_WHINE(null_fd, STDERR_FILENO));
+        whined = DUP2_OR_WHINE(null_fd, STDOUT_FILENO);
+        if (whined == did_whine)
+            _exit(whined);
+
+        whined = DUP2_OR_WHINE(null_fd, STDERR_FILENO);
+        if (whined == did_whine)
+            _exit(whined);
 
         // this is safe because we know it is not a standard fd
         close(null_fd);
@@ -640,7 +642,7 @@ static enum whined run_command_or_whine(
         execvp(argv[0], argv);
 
         // if we get here execvp failed
-        die(did_whine);
+        _exit(did_whine);
     }
 
     int status;
