@@ -189,28 +189,28 @@ static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
     return did_not_whine;
 }
 
-static bool same_file(const char* a, const char* b) {
+static enum whined whine_if_distinct_files(const char* a, const char* b) {
     struct stat a_stat;
     struct stat b_stat;
 
     if (stat(a, &a_stat) != 0) {
         int e = errno;
         errln("stat('%s') failed: %s", a, strerror(e));
-        return false;
+        return did_whine;
     }
 
     if (stat(b, &b_stat) != 0) {
         int e = errno;
         errln("stat('%s') failed: %s", b, strerror(e));
-        return false;
+        return did_whine;
     }
 
     if (a_stat.st_dev != b_stat.st_dev || a_stat.st_ino != b_stat.st_ino) {
         errln("'%s' and '%s' are not the same file", a, b);
-        return false;
+        return did_whine;
     }
 
-    return true;
+    return did_not_whine;
 }
 
 enum fs_blob_status {
@@ -516,7 +516,7 @@ int main(int argc, char** argv) {
 
     if (whine_if_not_fs_blob("./runme") == did_whine)
         return EXIT_FAILURE;
-    if (!same_file("/proc/self/exe", "./runme"))
+    if (whine_if_distinct_files("/proc/self/exe", "./runme") == did_whine)
         return EXIT_FAILURE;
 
     if (whine_if_not_fs_blob("./runme.c") == did_whine)
