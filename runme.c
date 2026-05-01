@@ -371,7 +371,7 @@ static bool is_standard_fd(int fd) {
     return false;
 }
 
-static enum whined copy_fd_to_target_or_whine(
+static enum whined dup2_or_whine(
     const char* value,
     int fd_value,
     const char* target,
@@ -396,8 +396,8 @@ static enum whined copy_fd_to_target_or_whine(
     return did_not_whine;
 }
 
-#define COPY_FD_TO_TARGET_OR_WHINE(value, target) \
-    copy_fd_to_target_or_whine(#value, value, #target, target)
+#define DUP2_OR_WHINE(value, target) \
+    dup2_or_whine(#value, value, #target, target)
 
 static void die(void) {
     _exit(EXIT_FAILURE);
@@ -436,8 +436,8 @@ static enum whined whine_if_command_fails(char* const argv[]) {
             die();
         }
 
-        die_if_whined(COPY_FD_TO_TARGET_OR_WHINE(null_fd, STDOUT_FILENO));
-        die_if_whined(COPY_FD_TO_TARGET_OR_WHINE(null_fd, STDERR_FILENO));
+        die_if_whined(DUP2_OR_WHINE(null_fd, STDOUT_FILENO));
+        die_if_whined(DUP2_OR_WHINE(null_fd, STDERR_FILENO));
 
         // this is safe because we know it is not a standard fd
         close(null_fd);
