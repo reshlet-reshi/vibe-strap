@@ -13,29 +13,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static enum whined parse_args_or_whine(int argc, char** argv) {
-    RETURN_IF_WHINED(
-        require(
-            (argc >= 1) && (argv[0] != NULL),
-            did_whine,
-            "missing program name: argc (%d), argv[0] (%p)",
-            argc,
-            argv[0]
-        )
-    );
-
-    RETURN_IF_WHINED(
-        require(
-            argc == 1,
-            did_whine,
-            "expected no arguments, got %d",
-            argc - 1
-        )
-    );
-
-    return did_not_whine;
-}
-
 static enum whined whine_if_host_unsupported(void) {
     struct utsname uts;
     RETURN_IF_WHINED(
@@ -778,7 +755,25 @@ enum whined main_check_lock_fd(
 }
 
 int main(int argc, char** argv) {
-    RETURN_IF_WHINED(parse_args_or_whine(argc, argv));
+    RETURN_IF_WHINED(
+        require(
+            (argc >= 1) && (argv[0] != NULL),
+            did_whine,
+            "missing program name: argc (%d), argv[0] (%p)",
+            argc,
+            argv[0]
+        )
+    );
+
+    RETURN_IF_WHINED(
+        require(
+            argc == 1,
+            did_whine,
+            "expected no arguments, got %d",
+            argc - 1
+        )
+    );
+
     RETURN_IF_WHINED(whine_if_host_unsupported());
     RETURN_IF_WHINED(whine_if_standard_fd_missing());
 
