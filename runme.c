@@ -191,14 +191,13 @@ static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
 
 static enum whined whine_if_distinct_files(const char* a, const char* b) {
     struct stat a_stat;
-    struct stat b_stat;
-
     if (stat(a, &a_stat) != 0) {
         int e = errno;
         whine("stat('%s') failed: %s", a, strerror(e));
         return did_whine;
     }
 
+    struct stat b_stat;
     if (stat(b, &b_stat) != 0) {
         int e = errno;
         whine("stat('%s') failed: %s", b, strerror(e));
@@ -253,32 +252,32 @@ static enum whined whine_if_not_fs_blob(const char* path) {
     }
 
     int error;
-    enum fs_blob_status stat = fs_blob_status(path, &error);
+    enum fs_blob_status blob_stat = fs_blob_status(path, &error);
 
-    if (stat == fs_blob_exists)
+    if (blob_stat == fs_blob_exists)
         return did_not_whine;
 
-    if (stat == fs_blob_stat_error) {
+    if (blob_stat == fs_blob_stat_error) {
         whine("stat('%s') failed: %s", path, strerror(error));
-    } else if (stat == fs_blob_wrong_mode) {
+    } else if (blob_stat == fs_blob_wrong_mode) {
         whine("'%s' is not a regular file", path);
     } else {
         whine(
             "internal error: unexpected fs_blob_status '%d'.\n"
             "from: whine_if_not_fs_blob",
-            stat
+            blob_stat
         );
     }
 
     return did_whine;
 }
 
-static bool file_has_exact_content(const char* path, const char* expected) {
+static enum whined whine_if_wrong_text_at_path(const char* path, const char* expected) {
     FILE* file = fopen(path, "rb");
     if (file == NULL) {
         int e = errno;
         whine("fopen('%s') failed: %s", path, strerror(e));
-        return false;
+        return did_whine;
     }
 
     for (size_t i = 0; expected[i] != '\0'; ++i) {
@@ -291,13 +290,13 @@ static bool file_has_exact_content(const char* path, const char* expected) {
                 whine("'%s' ended before expected content", path);
             }
             fclose(file);
-            return false;
+            return did_whine;
         }
 
         if ((char)ch != expected[i]) {
             whine("'%s' does not contain the expected content", path);
             fclose(file);
-            return false;
+            return did_whine;
         }
     }
 
@@ -305,34 +304,34 @@ static bool file_has_exact_content(const char* path, const char* expected) {
     if (ch != EOF) {
         whine("'%s' has unexpected extra content", path);
         fclose(file);
-        return false;
+        return did_whine;
     }
     if (ferror(file)) {
         int e = errno;
         whine("fgetc('%s') failed: %s", path, strerror(e));
         fclose(file);
-        return false;
+        return did_whine;
     }
 
     if (fclose(file) != 0) {
         int e = errno;
         whine("fclose('%s') failed: %s", path, strerror(e));
-        return false;
+        return did_whine;
     }
 
-    return true;
+    return did_not_whine;
 }
 
-static bool expected_gitignore_exists(void) {
+static bool whine_if_wrong_gitignore(void) {
     static const char expected[] =
         ".ignore/\n"
         "runme\n"
         ".codex\n";
 
     if (whine_if_not_fs_blob("./.gitignore") == did_whine)
-        return false;
+        return did_whine;
 
-    return file_has_exact_content("./.gitignore", expected);
+    return whine_if_wrong_text_at_path("./.gitignore", expected);
 }
 
 static bool is_standard_fd(int fd) {
@@ -524,7 +523,7 @@ int main(int argc, char** argv) {
     if (whine_if_not_fs_blob("./runme.c") == did_whine)
         return EXIT_FAILURE;
 
-    if (!expected_gitignore_exists())
+    if (whine_if_wrong_gitignore() == did_whine)
         return EXIT_FAILURE;
 
     if (!expected_files_are_tracked())
