@@ -176,7 +176,7 @@ static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
     // drop the basename
     *(last_slash + 1) = '\0';
 
-    if (chdir(buffer)) {
+    if (chdir(buffer) != 0) {
         int e = errno;
         errln(
             "chdir('%s') failed: %s",
@@ -409,6 +409,8 @@ static bool command_succeeds(char* const argv[]) {
         close(null_fd);
 
         execvp(argv[0], argv);
+
+        // if we get here execvp failed
         _exit(EXIT_FAILURE);
     }
 
