@@ -150,21 +150,70 @@ enum {
 };
 
 struct result {
-    int status;
-    int sys_error;
-    int fd;
+    struct {
+        const char* path;
+        int fd;
+    } in;
+
+    struct {
+        int status;
+        int sys_error;
+        int fd;
+    } out;
 };
 
-static struct result is_fd_regular_file(int fd) {
+static enum whined whine_result(struct result result) {
+    switch (result.out.status) {
+    case s_ok:
+        return did_not_whine;
+
+    case s_open_failed:
+        return require(
+            false,
+            did_whine,
+            "open('%s') failed: %s",
+            result.in.path,
+            strerror(result.out.sys_error)
+        );
+
+    case s_fstat_failed:
+        return require(
+            false,
+            did_whine,
+            "fstat('%s') failed: %s",
+            result.in.path,
+            strerror(result.out.sys_error)
+        );
+
+    case s_not_regular_file:
+        return require(
+            false,
+            did_whine,
+            "'%s' is not a regular file",
+            result.in.path
+        );
+    }
+
+    return require(
+        false,
+        did_whine,
+        "internal error: unknown result status %d",
+        result.out.status
+    );
+}
+
+static struct result is_fd_regular_file(const char* path, int fd) {
     struct result result = {0};
-    result.fd = -1;
+    result.in.path = path;
+    result.in.fd = fd;
+    result.out.fd = -1;
 
     struct stat st;
     if (fstat(fd, &st) < 0) {
-        result.status = s_fstat_failed;
-        result.sys_error = errno;
+        result.out.status = s_fstat_failed;
+        result.out.sys_error = errno;
     } else if (!S_ISREG(st.st_mode)) {
-        result.status = s_not_regular_file;
+        result.out.status = s_not_regular_file;
     }
 
     errno = 0;
@@ -173,11 +222,13 @@ static struct result is_fd_regular_file(int fd) {
 
 static struct result open_path_fd(const char* path) {
     struct result result = {0};
-    result.fd = open(path, O_PATH | O_CLOEXEC);
+    result.in.path = path;
+    result.in.fd = -1;
+    result.out.fd = open(path, O_PATH | O_CLOEXEC);
 
-    if (result.fd < 0) {
-        result.status = s_open_failed;
-        result.sys_error = errno;
+    if (result.out.fd < 0) {
+        result.out.status = s_open_failed;
+        result.out.sys_error = errno;
     }
 
     errno = 0;
@@ -195,42 +246,12 @@ static enum whined whine_if_not_fs_blob_path(const char* path) {
     );
 
     struct result opened = open_path_fd(path);
-    RETURN_IF_WHINED(
-        require(
-            opened.status == s_ok,
-            did_whine,
-            "open('%s') failed: %s", 
-            path, 
-            strerror(opened.sys_error)
-        )
+    RETURN_IF_WHINED(whine_result(opened));
+
+    int fd = opened.out.fd;
+    enum whined whined = whine_result(
+        is_fd_regular_file(path, fd)
     );
-
-    int fd = opened.fd;
-    enum whined whined = did_not_whine;
-    struct result file = is_fd_regular_file(fd);
-    switch (file.status) {
-    case s_ok:
-        break;
-
-    case s_fstat_failed:
-        whined = require(
-            false,
-            did_whine,
-            "fstat('%s') failed: %s",
-            path,
-            strerror(file.sys_error)
-        );
-        break;
-
-    case s_not_regular_file:
-        whined = require(
-            false,
-            did_whine,
-            "'%s' is not a regular file",
-            path
-        );
-        break;
-    }
 
     int status = close(fd);
     int e = errno;
@@ -643,32 +664,10 @@ static enum whined open_blob_or_whine(
         );
     }
 
-    struct result file = is_fd_regular_file(fd);
-    switch (file.status) {
-    case s_ok:
-        break;
-
-    case s_fstat_failed:
-        require(
-            false,
-            did_whine,
-            "fstat('%s') failed: %s",
-            path,
-            strerror(file.sys_error)
-        );
-        break;
-
-    case s_not_regular_file:
-        require(
-            false,
-            did_whine,
-            "'%s' is not a regular file",
-            path
-        );
-        break;
-    }
-
-    if (file.status != s_ok) {
+    enum whined whined = whine_result(
+        is_fd_regular_file(path, fd)
+    );
+    if (whined == did_whine) {
         int status = close(fd);
         e = errno;
         require(
