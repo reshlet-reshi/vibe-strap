@@ -23,10 +23,15 @@ static void errln(const char* format, ...) {
     fprintf(stderr, "\n");
 }
 
-static bool parse_args(int argc, char** argv) {
+enum whined {
+    did_not_whine,
+    whined,
+};
+
+static enum whined parse_args_or_whine(int argc, char** argv) {
     if (argc < 1 || argv[0] == NULL) {
         errln("missing program name");
-        return false;
+        return whined;
     }
     called_as = argv[0];
 
@@ -35,10 +40,10 @@ static bool parse_args(int argc, char** argv) {
             "expected no arguments, got %d",
             argc - 1
         );
-        return false;
+        return whined;
     }
 
-    return true;
+    return did_not_whine;
 }
 
 static bool check_host(void) {
@@ -240,11 +245,6 @@ static enum fs_blob_status fs_blob_status(
 
     return fs_blob_exists;
 }
-
-enum whined {
-    did_not_whine,
-    whined,
-};
 
 static enum whined whine_if_not_fs_blob(const char* path) {
     if (!path) {
@@ -494,7 +494,7 @@ static bool ensure_directory_exists(const char* path) {
 }
 
 int main(int argc, char** argv) {
-    if (!parse_args(argc, argv))
+    if (parse_args_or_whine(argc, argv) == whined)
         return EXIT_FAILURE;
     if (!check_host())
         return EXIT_FAILURE;
