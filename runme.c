@@ -354,14 +354,14 @@ static bool is_standard_fd(int fd) {
     return false;
 }
 
-static bool copy_fd_to_target(
+static enum whined copy_fd_to_target_or_whine(
     const char* value,
     int fd_value,
     const char* target,
     int fd_target
 ) {
     if (fd_value == fd_target)
-        return true;
+        return did_not_whine;
 
     if (dup2(fd_value, fd_target) < 0) {
         int e = errno;
@@ -373,13 +373,14 @@ static bool copy_fd_to_target(
             fd_target,
             strerror(e)
         );
-        return false;
+        return did_whine;
     }
 
-    return true;
+    return did_not_whine;
 }
 
-#define COPY_FD_TO_TARGET(value, target) copy_fd_to_target(#value, value, #target, target)
+#define COPY_FD_TO_TARGET_OR_WHINE(value, target) \
+    copy_fd_to_target_or_whine(#value, value, #target, target)
 
 static bool command_succeeds(char* const argv[]) {
     pid_t pid = fork();
@@ -408,10 +409,10 @@ static bool command_succeeds(char* const argv[]) {
             _exit(EXIT_FAILURE);
         }
 
-        if (!COPY_FD_TO_TARGET(null_fd, STDOUT_FILENO))
+        if (COPY_FD_TO_TARGET_OR_WHINE(null_fd, STDOUT_FILENO) == did_whine)
             _exit(EXIT_FAILURE);
 
-        if (!COPY_FD_TO_TARGET(null_fd, STDERR_FILENO))
+        if (COPY_FD_TO_TARGET_OR_WHINE(null_fd, STDERR_FILENO) == did_whine)
             _exit(EXIT_FAILURE);
 
         // this is safe because we know it is not a standard fd
