@@ -466,30 +466,30 @@ static enum whined whine_if_file_untracked(char* path) {
     return did_not_whine;
 }
 
-static bool ensure_directory_exists(const char* path) {
+static enum whined mkdir_or_whine(const char* path) {
     // mode of 0777 mimics shell
     if (mkdir(path, 0777) == 0)
-        return true;
+        return did_not_whine;
 
     int e = errno;
     if (e != EEXIST) {
         whine("mkdir('%s') failed: %s", path, strerror(e));
-        return false;
+        return did_whine;
     }
 
     struct stat st;
     if (stat(path, &st) != 0) {
         e = errno;
         whine("stat('%s') failed: %s", path, strerror(e));
-        return false;
+        return did_whine;
     }
 
     if (!S_ISDIR(st.st_mode)) {
         whine("'%s' is not a directory", path);
-        return false;
+        return did_whine;
     }
 
-    return true;
+    return did_not_whine;
 }
 
 int main(int argc, char** argv) {
@@ -540,9 +540,9 @@ int main(int argc, char** argv) {
     if (whine_if_file_untracked(".gitignore") == did_whine)
         return EXIT_FAILURE;
 
-    if (!ensure_directory_exists("./.ignore"))
+    if (mkdir_or_whine("./.ignore") == did_whine)
         return EXIT_FAILURE;
-    if (!ensure_directory_exists("./.ignore/.cache"))
+    if (mkdir_or_whine("./.ignore/.cache") == did_whine)
         return EXIT_FAILURE;
 
     puts("OK");
