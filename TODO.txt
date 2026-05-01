@@ -1,5 +1,6 @@
 
 - sys_open : fix create/mode (want to only pass mode if create)
+- ... then dup2_or_whine
 
 - whined -> exit_status
 
