@@ -445,7 +445,7 @@ static enum whined whine_if_command_fails(char* const argv[]) {
     return did_whine;
 }
 
-static bool is_file_tracked(char* path) {
+static enum whined whine_if_file_untracked(char* path) {
     char* const argv[] = {
         "git",
         "ls-files",
@@ -460,10 +460,10 @@ static bool is_file_tracked(char* path) {
             "could not verify '%s' is tracked by git",
             path
         );
-        return false;
+        return did_whine;
     }
 
-    return true;
+    return did_not_whine;
 }
 
 static bool ensure_directory_exists(const char* path) {
@@ -535,9 +535,9 @@ int main(int argc, char** argv) {
     if (gitignore_whined == did_whine)
         return EXIT_FAILURE;
 
-    if (!is_file_tracked("runme.c"))
+    if (whine_if_file_untracked("runme.c") == did_whine)
         return EXIT_FAILURE;
-    if (!is_file_tracked(".gitignore"))
+    if (whine_if_file_untracked(".gitignore") == did_whine)
         return EXIT_FAILURE;
 
     if (!ensure_directory_exists("./.ignore"))
