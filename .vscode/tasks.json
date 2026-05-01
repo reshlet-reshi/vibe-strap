@@ -3,7 +3,7 @@
     "tasks": [
         {
             "label": "bootstrap",
-            "type": "shell",
+            "type": "process",
             "command": "sh",
             "args": [
                 "bootstrap.sh"
@@ -13,6 +13,7 @@
                 "isDefault": true
             },
             "presentation": {
+                "close": true,
                 "showReuseMessage": false
             },
             "problemMatcher": "$gcc"
