@@ -1,2 +1,10 @@
 - fork/patch the twitch caht extension to give me a little 
   poke when someone chats
+
+- { 
+    code=$?; 
+    printf '\\nfailed with status %s\\n
+    press enter to close...' \"$code\"; 
+    read _; 
+    exit \"$code\"; 
+    }
