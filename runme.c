@@ -11,12 +11,12 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static const char* called_as = "runme";
+static const char* our_name = "runme";
 
 static void errln(const char* format, ...) {
     va_list args;
 
-    fprintf(stderr, "%s: ", called_as);
+    fprintf(stderr, "%s: ", our_name);
     va_start(args, format);
     vfprintf(stderr, format, args);
     va_end(args);
@@ -33,7 +33,7 @@ static enum whined parse_args_or_whine(int argc, char** argv) {
         errln("missing program name");
         return did_whine;
     }
-    called_as = argv[0];
+    our_name = argv[0];
 
     if (argc != 1) {
         errln(
