@@ -491,15 +491,14 @@ static enum whined whine_if_file_untracked(char* path) {
         NULL
     };
 
-    if (whine_if_command_fails(argv) == did_whine) {
-        whine(
-            "could not verify '%s' is tracked by git",
-            path
-        );
-        return did_whine;
-    }
+    if (whine_if_command_fails(argv) == did_not_whine)
+        return did_not_whine;
 
-    return did_not_whine;
+    whine(
+        "could not verify '%s' is tracked by git",
+        path
+    );
+    return did_whine;
 }
 
 static enum whined mkdir_or_whine(const char* path) {
