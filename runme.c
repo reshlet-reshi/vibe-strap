@@ -92,25 +92,31 @@ static enum whined parse_args_or_whine(int argc, char** argv) {
 
 static enum whined whine_if_host_unsupported(void) {
     struct utsname uts;
-    if (uname(&uts) != 0) {
-        whine("uname failed");
-        return did_whine;
-    }
+    RETURN_IF_WHINED(
+        require(
+            uname(&uts) == 0, 
+            did_whine, 
+            "uname failed"
+        )
+    );
 
-    if (strcmp(uts.machine, "x86_64") != 0) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            strcmp(uts.machine, "x86_64") == 0, 
+            did_whine, 
             "we only support x86_64 hosts for now, not '%s'",
             uts.machine
-        );
-        return did_whine;
-    }
-    if (strcmp(uts.sysname, "Linux") != 0) {
-        whine(
+        )
+    );
+
+    RETURN_IF_WHINED(
+        require(
+            strcmp(uts.sysname, "Linux") == 0,
+            did_whine,
             "we only support Linux hosts for now, not '%s'",
             uts.sysname
-        );
-        return did_whine;
-    }
+        )
+    );
 
     return did_not_whine;
 }
@@ -124,49 +130,51 @@ static bool is_fd_open(int fd) {
 }
 
 static enum whined whine_if_standard_fd_missing(void) {
-    enum whined whined = did_not_whine;
-
-    if (!is_fd_open(STDIN_FILENO)) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            is_fd_open(STDIN_FILENO),
+            did_whine,
             "standard fd %s (%d) is not open",
             "STDIN_FILENO",
             STDIN_FILENO
-        );
-        whined = did_whine;
-    }
+        )
+    );
 
-    if (!is_fd_open(STDOUT_FILENO)) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            is_fd_open(STDOUT_FILENO),
+            did_whine,
             "standard fd %s (%d) is not open",
             "STDOUT_FILENO",
             STDOUT_FILENO
-        );
-        whined = did_whine;
-    }
+        )
+    );
 
-    if (!is_fd_open(STDERR_FILENO)) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            is_fd_open(STDERR_FILENO),
+            did_whine,
             "standard fd %s (%d) is not open",
             "STDERR_FILENO",
             STDERR_FILENO
-        );
-        whined = did_whine;
-    }
+        )
+    );
 
-    return whined;
+    return did_not_whine;
 }
 
 static enum whined cd_to_self_or_whine(
     char* buffer,
     size_t buffer_size
 ) {
-    if (buffer == NULL || buffer_size <= 1) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            buffer != NULL && buffer_size > 1,
+            did_whine,
             "internal error: "
             "invalid buffer passed to cd_to_self_or_whine"
-        );
-        return did_whine;
-    }
+        )
+    );
 
     // readlink does not null terminate,
     //  so reserve one byte in the buffer.
@@ -174,32 +182,38 @@ static enum whined cd_to_self_or_whine(
 
     static const char* link = "/proc/self/exe";
     ssize_t length = readlink(link, buffer, read_size);
+    int e = errno;
 
-    if (length < 0) {
-        int e = errno;
-        whine(
+    // null terminate
+    buffer[length] = '\0';
+
+    RETURN_IF_WHINED(
+        require(
+            length >= 0,
+            did_whine,
             "readlink(%s) failed: %s",
             link,
             strerror(e)
-        );
-        return did_whine;
-    }
+        )
+    );
 
-    if ((size_t)length >= read_size) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            (size_t)length < read_size,
+            did_whine,
             "readlink(%s) returned truncated path",
             link
-        );
-        return did_whine;
-    }
+        )
+    );
 
-    if (length == 0) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            length != 0,
+            did_whine,
             "%s resolved to an empty path",
             link
-        );
-        return did_whine;
-    }
+        )
+    );
 
     char* last_slash = &buffer[length - 1];
     while (last_slash > buffer) {
@@ -208,31 +222,30 @@ static enum whined cd_to_self_or_whine(
         --last_slash;
     }
 
-    if (*last_slash != '/') {
-        // null terminate for whine
-        buffer[length] = '\0';
-
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            *last_slash == '/',
+            did_whine,
             "%s path has no directory component: '%s'",
             link,
             buffer
-        );
-
-        return did_whine;
-    }
+        )
+    );
 
     // drop the basename
     *(last_slash + 1) = '\0';
 
-    if (chdir(buffer) != 0) {
-        int e = errno;
-        whine(
+    int chdir_status = chdir(buffer);
+    e = errno;
+    RETURN_IF_WHINED(
+        require(
+            chdir_status == 0,
+            did_whine,
             "chdir('%s') failed: %s",
             buffer,
             strerror(e)
-        );
-        return did_whine;
-    }
+        )
+    );
 
     return did_not_whine;
 }
@@ -242,29 +255,46 @@ static enum whined whine_if_distinct_files(
     const char* b
 ) {
     struct stat a_stat;
-    if (stat(a, &a_stat) != 0) {
-        int e = errno;
-        whine("stat('%s') failed: %s", a, strerror(e));
-        return did_whine;
-    }
+    int status = stat(a, &a_stat);
+    int e = errno;
+    RETURN_IF_WHINED(
+        require(
+            status == 0,
+            did_whine,
+            "stat('%s') failed: %s", 
+            a, 
+            strerror(e)
+        )
+    );
 
     struct stat b_stat;
-    if (stat(b, &b_stat) != 0) {
-        int e = errno;
-        whine("stat('%s') failed: %s", b, strerror(e));
-        return did_whine;
-    }
+    status = stat(b, &b_stat);
+    e = errno;
+    RETURN_IF_WHINED(
+        require(
+            status == 0,
+            did_whine,
+            "stat('%s') failed: %s", 
+            b, 
+            strerror(e)
+        )
+    );
 
-    if (a_stat.st_dev != b_stat.st_dev ||
-        a_stat.st_ino != b_stat.st_ino
-    ) {
-        whine("'%s' and '%s' are not the same file", a, b);
-        return did_whine;
-    }
+    RETURN_IF_WHINED(
+        require(
+            a_stat.st_dev == b_stat.st_dev &&
+            a_stat.st_ino == b_stat.st_ino,
+            did_whine,
+            "'%s' and '%s' are not the same file", 
+            a, 
+            b
+        )
+    );
 
     return did_not_whine;
 }
 
+// TODO inline fs_blob_status
 enum fs_blob_status {
     fs_blob_0,
 
@@ -298,13 +328,14 @@ static enum whined whine_if_not_fs_blob(
     const char* path,
     int fd
 ) {
-    if (!path) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            path != NULL,
+            did_whine,
             "internal error: "
             "null path passed to whine_if_not_fs_blob"
-        );
-        return did_whine;
-    }
+        )
+    );
 
     int error;
     enum fs_blob_status blob_stat;
@@ -336,28 +367,40 @@ static enum whined whine_if_not_fs_blob(
 }
 
 static enum whined whine_if_not_fs_blob_path(const char* path) {
-    if (!path) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            path != NULL,
+            did_whine,
             "internal error: "
             "null path passed to whine_if_not_fs_blob_path"
-        );
-        return did_whine;
-    }
+        )
+    );
 
     int fd = open(path, O_PATH | O_CLOEXEC);
-    if (fd < 0) {
-        int e = errno;
-        whine("open('%s') failed: %s", path, strerror(e));
-        return did_whine;
-    }
+    int e = errno;
+    RETURN_IF_WHINED(
+        require(
+            fd >= 0,
+            did_whine,
+            "open('%s') failed: %s", 
+            path, 
+            strerror(e)
+        )
+    );
 
     enum whined whined = whine_if_not_fs_blob(path, fd);
 
-    if (close(fd) != 0) {
-        int e = errno;
-        whine("close('%s') failed: %s", path, strerror(e));
-        return did_whine;
-    }
+    int status = close(fd);
+    e = errno;
+    RETURN_IF_WHINED(
+        require(
+            status == 0,
+            did_whine,
+            "close('%s') failed: %s", 
+            path, 
+            strerror(e)
+        )
+    );
 
     return whined;
 }
@@ -370,30 +413,32 @@ static enum whined whine_if_wrong_text_at_fd(
     enum { buffer_size = 4096, };
     char buffer[buffer_size];
 
-    if (lseek(fd, 0, SEEK_SET) == (off_t)-1) {
-        int e = errno;
-        whine(
+    off_t offset = lseek(fd, 0, SEEK_SET);
+    int e = errno;
+    RETURN_IF_WHINED(
+        require(
+            offset == 0,
+            did_whine,
             "lseek('%s') failed: %s",
             path,
             strerror(e)
-        );
-        return did_whine;
-    }
+        )
+    );
 
-    size_t offset = 0;
+    size_t length = 0;
     size_t expected_length = strlen(expected);
-    while (offset < expected_length) {
-        size_t remaining = expected_length - offset;
+    while (length < expected_length) {
+        size_t remaining = expected_length - length;
         size_t chunk_size = remaining < sizeof(buffer)
             ? remaining
             : sizeof(buffer);
 
         ssize_t n = read(fd, buffer, chunk_size);
         if (n < 0) {
-            if (errno == EINTR)
+            e = errno;
+            if (e == EINTR)
                 continue;
 
-            int e = errno;
             whine(
                 "read('%s') failed: %s",
                 path,
@@ -402,23 +447,25 @@ static enum whined whine_if_wrong_text_at_fd(
             return did_whine;
         }
 
-        if (n == 0) {
-            whine(
+        RETURN_IF_WHINED(
+            require(
+                n != 0,
+                did_whine,
                 "'%s' ended before expected content",
                 path
-            );
-            return did_whine;
-        }
+            )
+        );
 
-        if (memcmp(buffer, expected + offset, (size_t)n) != 0) {
-            whine(
+        RETURN_IF_WHINED(
+            require(
+                memcmp(buffer, expected + length, (size_t)n) == 0,
+                did_whine,
                 "'%s' does not contain the expected content",
                 path
-            );
-            return did_whine;
-        }
+            )
+        );
 
-        offset += (size_t)n;
+        length += (size_t)n;
     }
 
     for (;;) {
@@ -427,7 +474,7 @@ static enum whined whine_if_wrong_text_at_fd(
             if (errno == EINTR)
                 continue;
 
-            int e = errno;
+            e = errno;
             whine(
                 "read('%s') failed: %s",
                 path,
