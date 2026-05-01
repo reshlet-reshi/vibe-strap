@@ -718,8 +718,18 @@ enum whined main_check_lock_fd(
     const char* lock_path,
     int lock_fd
 ) {
-    // TODO LATER
-    // actualy try to lock the fd
+    struct flock lock = {
+        .l_type = F_WRLCK,
+        .l_whence = SEEK_SET,
+        .l_start = 0,
+        .l_len = 0,
+    };
+
+    if (fcntl(lock_fd, F_SETLK, &lock) != 0) {
+        int e = errno;
+        whine("lock('%s') failed: %s", lock_path, strerror(e));
+        return did_whine;
+    }
 
     return whine_if_wrong_text_at_fd(lock_path, lock_fd, "");
 }
