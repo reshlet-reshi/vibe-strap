@@ -370,6 +370,10 @@ static enum whined copy_fd_to_target_or_whine(
 #define COPY_FD_TO_TARGET_OR_WHINE(value, target) \
     copy_fd_to_target_or_whine(#value, value, #target, target)
 
+static void die(void) {
+    _exit(EXIT_FAILURE);
+}
+
 static enum whined whine_if_command_fails(char* const argv[]) {
     pid_t pid = fork();
     if (pid < 0) {
@@ -380,12 +384,12 @@ static enum whined whine_if_command_fails(char* const argv[]) {
 
     if (pid == 0) {
         if (whine_if_standard_fd_missing() == did_whine)
-            _exit(EXIT_FAILURE);
+            die();
 
         int null_fd = open("/dev/null", O_WRONLY);
         if (null_fd < 0) {
             whine("failed to open '/dev/null'");
-            _exit(EXIT_FAILURE);
+            die();
         }
 
         // NOTE this check is mostly redundant, since we
@@ -394,14 +398,14 @@ static enum whined whine_if_command_fails(char* const argv[]) {
         //  we could get surprised, so check anyway.
         if (is_standard_fd(null_fd)) {
             whine("'/dev/null' opened as standard fd");
-            _exit(EXIT_FAILURE);
+            die();
         }
 
         if (COPY_FD_TO_TARGET_OR_WHINE(null_fd, STDOUT_FILENO) == did_whine)
-            _exit(EXIT_FAILURE);
+            die();
 
         if (COPY_FD_TO_TARGET_OR_WHINE(null_fd, STDERR_FILENO) == did_whine)
-            _exit(EXIT_FAILURE);
+            die();
 
         // this is safe because we know it is not a standard fd
         close(null_fd);
@@ -409,7 +413,7 @@ static enum whined whine_if_command_fails(char* const argv[]) {
         execvp(argv[0], argv);
 
         // if we get here execvp failed
-        _exit(EXIT_FAILURE);
+        die();
     }
 
     int status;
