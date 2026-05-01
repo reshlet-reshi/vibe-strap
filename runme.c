@@ -273,8 +273,8 @@ static enum whined whine_if_not_fs_blob(const char* path) {
 }
 
 static enum whined whine_if_wrong_text_in_file(
-    const char* path, 
-    FILE* file, 
+    const char* path,
+    FILE* file,
     const char* expected
 ) {
     for (size_t i = 0; expected[i] != '\0'; ++i) {
@@ -521,7 +521,7 @@ int main(int argc, char** argv) {
     if (whine_if_not_fs_blob("./runme.c") == did_whine)
         return EXIT_FAILURE;
     if (whine_if_not_fs_blob("./.gitignore") == did_whine)
-        return did_whine;
+        return EXIT_FAILURE;
 
     static const char expected_gitignore[] =
         ".ignore/\n"
@@ -529,7 +529,7 @@ int main(int argc, char** argv) {
         ".codex\n";
 
     enum whined gitignore_whined = whine_if_wrong_text_at_path(
-        "./.gitignore", 
+        "./.gitignore",
         expected_gitignore
     );
     if (gitignore_whined == did_whine)
