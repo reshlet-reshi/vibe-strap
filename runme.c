@@ -15,18 +15,29 @@
 
 enum {
     s_ok,
+    s_invalid_buffer,
     s_open_failed,
     s_fcntl_failed,
     s_fd_not_open,
     s_fstat_failed,
     s_not_regular_file,
+    s_readlink_failed,
+    s_readlink_truncated,
+    s_readlink_empty,
+    s_no_directory_component,
+    s_chdir_failed,
 };
 
 struct result {
     struct {
         const char* path;
         int fd;
+        size_t buffer_size;
     } in;
+
+    struct {
+        char* buffer;
+    } in_out;
 
     struct {
         int status;
@@ -39,6 +50,14 @@ static enum whined whine_result(struct result result) {
     switch (result.out.status) {
     case s_ok:
         return did_not_whine;
+
+    case s_invalid_buffer:
+        return require(
+            false,
+            did_whine,
+            "internal error: "
+            "invalid buffer passed to cd_to_self"
+        );
 
     case s_open_failed:
         return require(
@@ -84,6 +103,49 @@ static enum whined whine_result(struct result result) {
             "'%s' is not a regular file",
             result.in.path
         );
+
+    case s_readlink_failed:
+        return require(
+            false,
+            did_whine,
+            "readlink(%s) failed: %s",
+            result.in.path,
+            strerror(result.out.sys_error)
+        );
+
+    case s_readlink_truncated:
+        return require(
+            false,
+            did_whine,
+            "readlink(%s) returned truncated path",
+            result.in.path
+        );
+
+    case s_readlink_empty:
+        return require(
+            false,
+            did_whine,
+            "%s resolved to an empty path",
+            result.in.path
+        );
+
+    case s_no_directory_component:
+        return require(
+            false,
+            did_whine,
+            "%s path has no directory component: '%s'",
+            result.in.path,
+            result.in_out.buffer
+        );
+
+    case s_chdir_failed:
+        return require(
+            false,
+            did_whine,
+            "chdir('%s') failed: %s",
+            result.in_out.buffer,
+            strerror(result.out.sys_error)
+        );
     }
 
     return require(
@@ -114,73 +176,47 @@ static struct result is_fd_open(const char* path, int fd) {
     return result;
 }
 
-static enum whined whine_if_standard_fd_missing(void) {
-    RETURN_IF_WHINED(
-        whine_result(is_fd_open("STDIN_FILENO", STDIN_FILENO))
-    );
-
-    RETURN_IF_WHINED(
-        whine_result(is_fd_open("STDOUT_FILENO", STDOUT_FILENO))
-    );
-
-    RETURN_IF_WHINED(
-        whine_result(is_fd_open("STDERR_FILENO", STDERR_FILENO))
-    );
-
-    return did_not_whine;
-}
-
-static enum whined cd_to_self_or_whine(
+static struct result cd_to_self(
     char* buffer,
     size_t buffer_size
 ) {
-    RETURN_IF_WHINED(
-        require(
-            buffer != NULL && buffer_size > 1,
-            did_whine,
-            "internal error: "
-            "invalid buffer passed to cd_to_self_or_whine"
-        )
-    );
+    struct result result = {0};
+    result.in.path = "/proc/self/exe";
+    result.in.buffer_size = buffer_size;
+    result.in_out.buffer = buffer;
+    result.out.fd = -1;
+
+    if (buffer == NULL || buffer_size <= 1) {
+        result.out.status = s_invalid_buffer;
+        return result;
+    }
 
     // readlink does not null terminate,
     //  so reserve one byte in the buffer.
-    size_t read_size = buffer_size - 1;
+    size_t read_size = result.in.buffer_size - 1;
 
-    static const char* link = "/proc/self/exe";
-    ssize_t length = readlink(link, buffer, read_size);
-    int e = errno;
+    ssize_t length = readlink(result.in.path, buffer, read_size);
+    if (length < 0) {
+        result.out.status = s_readlink_failed;
+        result.out.sys_error = errno;
+        errno = 0;
+        return result;
+    }
 
     // null terminate
     buffer[length] = '\0';
 
-    RETURN_IF_WHINED(
-        require(
-            length >= 0,
-            did_whine,
-            "readlink(%s) failed: %s",
-            link,
-            strerror(e)
-        )
-    );
+    if ((size_t)length >= read_size) {
+        result.out.status = s_readlink_truncated;
+        errno = 0;
+        return result;
+    }
 
-    RETURN_IF_WHINED(
-        require(
-            (size_t)length < read_size,
-            did_whine,
-            "readlink(%s) returned truncated path",
-            link
-        )
-    );
-
-    RETURN_IF_WHINED(
-        require(
-            length != 0,
-            did_whine,
-            "%s resolved to an empty path",
-            link
-        )
-    );
+    if (length == 0) {
+        result.out.status = s_readlink_empty;
+        errno = 0;
+        return result;
+    }
 
     char* last_slash = &buffer[length - 1];
     while (last_slash > buffer) {
@@ -189,32 +225,24 @@ static enum whined cd_to_self_or_whine(
         --last_slash;
     }
 
-    RETURN_IF_WHINED(
-        require(
-            *last_slash == '/',
-            did_whine,
-            "%s path has no directory component: '%s'",
-            link,
-            buffer
-        )
-    );
+    if (*last_slash != '/') {
+        result.out.status = s_no_directory_component;
+        errno = 0;
+        return result;
+    }
 
     // drop the basename
     *(last_slash + 1) = '\0';
 
-    int chdir_status = chdir(buffer);
-    e = errno;
-    RETURN_IF_WHINED(
-        require(
-            chdir_status == 0,
-            did_whine,
-            "chdir('%s') failed: %s",
-            buffer,
-            strerror(e)
-        )
-    );
+    if (chdir(buffer) < 0) {
+        result.out.status = s_chdir_failed;
+        result.out.sys_error = errno;
+        errno = 0;
+        return result;
+    }
 
-    return did_not_whine;
+    errno = 0;
+    return result;
 }
 
 static struct result is_fd_regular_file(const char* path, int fd) {
@@ -488,7 +516,15 @@ static enum whined run_command_or_whine(
     );
 
     if (pid == 0) {
-        die_if_whined(whine_if_standard_fd_missing());
+        die_if_whined(
+            whine_result(is_fd_open("STDIN_FILENO", STDIN_FILENO))
+        );
+        die_if_whined(
+            whine_result(is_fd_open("STDOUT_FILENO", STDOUT_FILENO))
+        );
+        die_if_whined(
+            whine_result(is_fd_open("STDERR_FILENO", STDERR_FILENO))
+        );
 
         int null_fd = open("/dev/null", O_WRONLY);
         die_if_whined(
@@ -500,8 +536,8 @@ static enum whined run_command_or_whine(
         );
 
         // NOTE this check is mostly redundant, since we
-        //  whine_if_standard_fd_missing above, so null_fd >= 3
-        //  at this point. But, in esoteric threaded cases,
+        //  checked the standard fds above, so null_fd >= 3 at
+        //  this point. But, in esoteric threaded cases,
         //  we could get surprised, so check anyway.
         die_if_whined(
             require(
@@ -792,14 +828,22 @@ int main(int argc, char** argv) {
         )
     );
 
-    RETURN_IF_WHINED(whine_if_standard_fd_missing());
+    RETURN_IF_WHINED(
+        whine_result(is_fd_open("STDIN_FILENO", STDIN_FILENO))
+    );
+    RETURN_IF_WHINED(
+        whine_result(is_fd_open("STDOUT_FILENO", STDOUT_FILENO))
+    );
+    RETURN_IF_WHINED(
+        whine_result(is_fd_open("STDERR_FILENO", STDERR_FILENO))
+    );
 
     enum { buffer_size = 65536, };
     char* buffer = malloc(buffer_size);
     RETURN_IF_WHINED(require(buffer, did_whine, "out of memory"));
 
     enum whined whined;
-    whined = cd_to_self_or_whine(buffer, buffer_size);
+    whined = whine_result(cd_to_self(buffer, buffer_size));
     free(buffer);
     RETURN_IF_WHINED(whined);
 
