@@ -294,36 +294,6 @@ static enum whined whine_if_distinct_files(
     return did_not_whine;
 }
 
-// TODO inline fs_blob_status
-enum fs_blob_status {
-    fs_blob_0,
-
-    fs_blob_null_error_pointer,
-
-    fs_blob_exists,
-    fs_blob_stat_error,
-    fs_blob_wrong_mode,
-};
-
-static enum fs_blob_status fs_blob_status(
-    int fd,
-    int* p_error
-) {
-    if (!p_error)
-        return fs_blob_null_error_pointer;
-
-    struct stat st;
-    if (fstat(fd, &st) != 0) {
-        *p_error = errno;
-        return fs_blob_stat_error;
-    }
-
-    if (!S_ISREG(st.st_mode))
-        return fs_blob_wrong_mode;
-
-    return fs_blob_exists;
-}
-
 static enum whined whine_if_not_fs_blob(
     const char* path,
     int fd
@@ -337,33 +307,29 @@ static enum whined whine_if_not_fs_blob(
         )
     );
 
-    int error;
-    enum fs_blob_status blob_stat;
-    blob_stat = fs_blob_status(fd, &error);
-
-    if (blob_stat == fs_blob_exists)
-        return did_not_whine;
-
-    if (blob_stat == fs_blob_stat_error) {
-        whine(
+    struct stat st;
+    int status = fstat(fd, &st);
+    int e = errno;
+    RETURN_IF_WHINED(
+        require(
+            status == 0,
+            did_whine,
             "fstat('%s') failed: %s",
             path,
-            strerror(error)
-        );
-    } else if (blob_stat == fs_blob_wrong_mode) {
-        whine(
+            strerror(e)
+        )
+    );
+
+    RETURN_IF_WHINED(
+        require(
+            S_ISREG(st.st_mode),
+            did_whine,
             "'%s' is not a regular file",
             path
-        );
-    } else {
-        whine(
-            "internal error: unexpected fs_blob_status '%d'.\n"
-            "from: whine_if_not_fs_blob",
-            blob_stat
-        );
-    }
+        )
+    );
 
-    return did_whine;
+    return did_not_whine;
 }
 
 static enum whined whine_if_not_fs_blob_path(const char* path) {
@@ -501,15 +467,16 @@ static enum whined whine_if_wrong_text_at_path(
     const char* expected
 ) {
     int fd = open(path, O_RDONLY | O_CLOEXEC);
-    if (fd < 0) {
-        int e = errno;
-        whine(
+    int e = errno;
+    RETURN_IF_WHINED(
+        require(
+            fd >= 0,
+            did_whine,
             "open('%s') failed: %s",
             path,
             strerror(e)
-        );
-        return did_whine;
-    }
+        )
+    );
 
     enum whined whined;
     whined = whine_if_wrong_text_at_fd(
@@ -518,15 +485,17 @@ static enum whined whine_if_wrong_text_at_path(
         expected
     );
 
-    if (close(fd) != 0) {
-        int e = errno;
-        whine(
+    int status = close(fd);
+    e = errno;
+    RETURN_IF_WHINED(
+        require(
+            status == 0,
+            did_whine,
             "close('%s') failed: %s",
             path,
             strerror(e)
-        );
-        return did_whine;
-    }
+        )
+    );
 
     return whined;
 }
@@ -550,18 +519,20 @@ static enum whined dup2_or_whine(
     if (fd_value == fd_target)
         return did_not_whine;
 
-    if (dup2(fd_value, fd_target) < 0) {
-        int e = errno;
-        whine(
+    int status = dup2(fd_value, fd_target);
+    int e = errno;
+    RETURN_IF_WHINED(
+        require(
+            status >= 0,
+            did_whine,
             "dup2(%s (%d), %s (%d)) failed: %s",
             value,
             fd_value,
             target,
             fd_target,
             strerror(e)
-        );
-        return did_whine;
-    }
+        )
+    );
 
     return did_not_whine;
 }
@@ -584,38 +555,49 @@ static enum whined run_command_or_whine(
     char* const argv[],
     int* p_exit_code
 ) {
-    if (!p_exit_code) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            p_exit_code != NULL,
+            did_whine,
             "internal error: "
             "null p_exit_code passed to run_command_or_whine"
-        );
-        return did_whine;
-    }
+        )
+    );
 
     pid_t pid = fork();
-    if (pid < 0) {
-        int e = errno;
-        whine("fork failed: %s", strerror(e));
-        return did_whine;
-    }
+    int e = errno;
+    RETURN_IF_WHINED(
+        require(
+            pid >= 0,
+            did_whine,
+            "fork failed: %s",
+            strerror(e)
+        )
+    );
 
     if (pid == 0) {
         die_if_whined(whine_if_standard_fd_missing());
 
         int null_fd = open("/dev/null", O_WRONLY);
-        if (null_fd < 0) {
-            whine("failed to open '/dev/null'");
-            die(did_whine);
-        }
+        die_if_whined(
+            require(
+                null_fd >= 0,
+                did_whine,
+                "failed to open '/dev/null'"
+            )
+        );
 
         // NOTE this check is mostly redundant, since we
         //  whine_if_standard_fd_missing above, so null_fd >= 3
         //  at this point. But, in esoteric threaded cases,
         //  we could get surprised, so check anyway.
-        if (is_standard_fd(null_fd)) {
-            whine("'/dev/null' opened as standard fd");
-            die(did_whine);
-        }
+        die_if_whined(
+            require(
+                is_standard_fd(null_fd) == false,
+                did_whine,
+                "'/dev/null' opened as standard fd"
+            )
+        );
 
         die_if_whined(DUP2_OR_WHINE(null_fd, STDOUT_FILENO));
         die_if_whined(DUP2_OR_WHINE(null_fd, STDERR_FILENO));
@@ -640,7 +622,7 @@ static enum whined run_command_or_whine(
         if (errno == EINTR)
             continue;
 
-        int e = errno;
+        e = errno;
         whine("waitpid failed: %s", strerror(e));
         return did_whine;
     }
@@ -650,14 +632,15 @@ static enum whined run_command_or_whine(
         return did_not_whine;
     }
 
-    if (WIFSIGNALED(status)) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            WIFSIGNALED(status) == 0,
+            did_whine,
             "'%s' was killed by signal %d",
             argv[0],
             WTERMSIG(status)
-        );
-        return did_whine;
-    }
+        )
+    );
 
     whine("'%s' ended unexpectedly", argv[0]);
     return did_whine;
@@ -698,33 +681,37 @@ static enum whined mkdir_or_whine(const char* path) {
         return did_not_whine;
 
     int e = errno;
-    if (e != EEXIST) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            e == EEXIST,
+            did_whine,
             "mkdir('%s') failed: %s",
             path,
             strerror(e)
-        );
-        return did_whine;
-    }
+        )
+    );
 
     struct stat st;
-    if (stat(path, &st) != 0) {
-        e = errno;
-        whine(
+    int status = stat(path, &st);
+    e = errno;
+    RETURN_IF_WHINED(
+        require(
+            status == 0,
+            did_whine,
             "stat('%s') failed: %s",
             path,
             strerror(e)
-        );
-        return did_whine;
-    }
+        )
+    );
 
-    if (!S_ISDIR(st.st_mode)) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            S_ISDIR(st.st_mode),
+            did_whine,
             "'%s' is not a directory",
             path
-        );
-        return did_whine;
-    }
+        )
+    );
 
     return did_not_whine;
 }
@@ -733,47 +720,64 @@ static enum whined open_blob_or_whine(
     const char* path,
     int* p_fd
 ) {
-    if (!path) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            path != NULL,
+            did_whine,
             "internal error: "
             "null path passed to open_blob_or_whine"
-        );
-        return did_whine;
-    }
+        )
+    );
 
-    if (!p_fd) {
-        whine(
+    RETURN_IF_WHINED(
+        require(
+            p_fd != NULL,
+            did_whine,
             "internal error: "
             "null p_fd passed to open_blob_or_whine"
-        );
-        return did_whine;
-    }
+        )
+    );
 
     // mode of 0666 mimics shell
     int fd = open(path, O_CREAT | O_EXCL | O_RDWR | O_CLOEXEC, 0666);
+    int e = errno;
     if (fd < 0) {
-        int e = errno;
-        if (e != EEXIST) {
-            whine("open('%s') failed: %s", path, strerror(e));
-            return did_whine;
-        }
+        RETURN_IF_WHINED(
+            require(
+                e == EEXIST,
+                did_whine,
+                "open('%s') failed: %s",
+                path,
+                strerror(e)
+            )
+        );
     }
 
     if (fd < 0) {
         fd = open(path, O_RDWR | O_CLOEXEC | O_NOFOLLOW);
-        if (fd < 0) {
-            int e = errno;
-            whine("open('%s') failed: %s", path, strerror(e));
-            return did_whine;
-        }
+        e = errno;
+        RETURN_IF_WHINED(
+            require(
+                fd >= 0,
+                did_whine,
+                "open('%s') failed: %s",
+                path,
+                strerror(e)
+            )
+        );
     }
 
     if (whine_if_not_fs_blob(path, fd) == did_whine)
     {
-        if (close(fd) != 0) {
-            int e = errno;
-            whine("close('%s') failed: %s", path, strerror(e));
-        }
+        int status = close(fd);
+        e = errno;
+        require(
+            status == 0,
+            did_whine,
+            "close('%s') failed: %s",
+            path,
+            strerror(e)
+        );
         return did_whine;
     }
 
@@ -792,11 +796,17 @@ enum whined main_check_lock_fd(
         .l_len = 0,
     };
 
-    if (fcntl(lock_fd, F_SETLK, &lock) != 0) {
-        int e = errno;
-        whine("lock('%s') failed: %s", lock_path, strerror(e));
-        return did_whine;
-    }
+    int status = fcntl(lock_fd, F_SETLK, &lock);
+    int e = errno;
+    RETURN_IF_WHINED(
+        require(
+            status == 0,
+            did_whine,
+            "lock('%s') failed: %s",
+            lock_path,
+            strerror(e)
+        )
+    );
 
     RETURN_IF_WHINED(
         whine_if_wrong_text_at_fd(lock_path, lock_fd, "")
@@ -867,11 +877,17 @@ int main(int argc, char** argv) {
 
     whined = main_check_lock_fd(lock_path, lock_fd);
 
-    if (close(lock_fd) != 0) {
-        int e = errno;
-        whine("close('%s') failed: %s", lock_path, strerror(e));
-        return did_whine;
-    }
+    int status = close(lock_fd);
+    int e = errno;
+    RETURN_IF_WHINED(
+        require(
+            status == 0,
+            did_whine,
+            "close('%s') failed: %s",
+            lock_path,
+            strerror(e)
+        )
+    );
 
     RETURN_IF_WHINED(whined);
 
