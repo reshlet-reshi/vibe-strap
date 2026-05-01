@@ -46,11 +46,11 @@ static enum whined parse_args_or_whine(int argc, char** argv) {
     return did_not_whine;
 }
 
-static bool check_host(void) {
+static enum whined whine_if_host_unsupported(void) {
     struct utsname uts;
     if (uname(&uts) != 0) {
         errln("uname failed");
-        return false;
+        return whined;
     }
 
     if (strcmp(uts.machine, "x86_64") != 0) {
@@ -58,17 +58,17 @@ static bool check_host(void) {
             "we only support x86_64 hosts for now, not '%s'",
             uts.machine
         );
-        return false;
+        return whined;
     }
     if (strcmp(uts.sysname, "Linux") != 0) {
         errln(
             "we only support Linux hosts for now, not '%s'",
             uts.sysname
         );
-        return false;
+        return whined;
     }
 
-    return true;
+    return did_not_whine;
 }
 
 static bool is_fd_open(int fd) {
@@ -496,7 +496,7 @@ static bool ensure_directory_exists(const char* path) {
 int main(int argc, char** argv) {
     if (parse_args_or_whine(argc, argv) == whined)
         return EXIT_FAILURE;
-    if (!check_host())
+    if (whine_if_host_unsupported() == whined)
         return EXIT_FAILURE;
 
     if (!has_standard_fds())
