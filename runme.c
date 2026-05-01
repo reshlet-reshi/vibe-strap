@@ -28,6 +28,11 @@ enum {
     s_no_directory_component,
     s_chdir_failed,
     s_close_failed,
+    s_lseek_failed,
+    s_read_failed,
+    s_ended_before_expected_content,
+    s_wrong_content,
+    s_unexpected_extra_content,
 };
 
 struct result {
@@ -170,6 +175,48 @@ static enum whined whine_result(struct result result) {
             "close('%s') failed: %s",
             result.in.path,
             strerror(result.out.sys_error)
+        );
+
+    case s_lseek_failed:
+        return require(
+            false,
+            did_whine,
+            "lseek('%s') failed: %s",
+            result.in.path,
+            strerror(result.out.sys_error)
+        );
+
+    case s_read_failed:
+        return require(
+            false,
+            did_whine,
+            "read('%s') failed: %s",
+            result.in.path,
+            strerror(result.out.sys_error)
+        );
+
+    case s_ended_before_expected_content:
+        return require(
+            false,
+            did_whine,
+            "'%s' ended before expected content",
+            result.in.path
+        );
+
+    case s_wrong_content:
+        return require(
+            false,
+            did_whine,
+            "'%s' does not contain the expected content",
+            result.in.path
+        );
+
+    case s_unexpected_extra_content:
+        return require(
+            false,
+            did_whine,
+            "'%s' has unexpected extra content",
+            result.in.path
         );
     }
 
@@ -360,25 +407,27 @@ static void is_path_regular_file(
     errno = 0;
 }
 
-static enum whined whine_if_wrong_text_at_fd(
+static void has_expected_text_at_fd(
     const char* path,
     int fd,
-    const char* expected
+    const char* expected,
+    struct result* result
 ) {
+    clear_result(result);
+    result->in.path = path;
+    result->in.fd = fd;
+
     enum { buffer_size = 4096, };
     char buffer[buffer_size];
 
+    errno = 0;
     off_t offset = lseek(fd, 0, SEEK_SET);
-    int e = errno;
-    RETURN_IF_WHINED(
-        require(
-            offset == 0,
-            did_whine,
-            "lseek('%s') failed: %s",
-            path,
-            strerror(e)
-        )
-    );
+    if (offset != 0) {
+        result->out.status = s_lseek_failed;
+        result->out.sys_error = errno;
+        errno = 0;
+        return;
+    }
 
     size_t length = 0;
     size_t expected_length = strlen(expected);
@@ -390,35 +439,26 @@ static enum whined whine_if_wrong_text_at_fd(
 
         ssize_t n = read(fd, buffer, chunk_size);
         if (n < 0) {
-            e = errno;
-            if (e == EINTR)
+            if (errno == EINTR)
                 continue;
 
-            whine(
-                "read('%s') failed: %s",
-                path,
-                strerror(e)
-            );
-            return did_whine;
+            result->out.status = s_read_failed;
+            result->out.sys_error = errno;
+            errno = 0;
+            return;
         }
 
-        RETURN_IF_WHINED(
-            require(
-                n != 0,
-                did_whine,
-                "'%s' ended before expected content",
-                path
-            )
-        );
+        if (n == 0) {
+            result->out.status = s_ended_before_expected_content;
+            errno = 0;
+            return;
+        }
 
-        RETURN_IF_WHINED(
-            require(
-                memcmp(buffer, expected + length, (size_t)n) == 0,
-                did_whine,
-                "'%s' does not contain the expected content",
-                path
-            )
-        );
+        if (memcmp(buffer, expected + length, (size_t)n) != 0) {
+            result->out.status = s_wrong_content;
+            errno = 0;
+            return;
+        }
 
         length += (size_t)n;
     }
@@ -429,26 +469,21 @@ static enum whined whine_if_wrong_text_at_fd(
             if (errno == EINTR)
                 continue;
 
-            e = errno;
-            whine(
-                "read('%s') failed: %s",
-                path,
-                strerror(e)
-            );
-            return did_whine;
+            result->out.status = s_read_failed;
+            result->out.sys_error = errno;
+            errno = 0;
+            return;
         }
 
         if (n == 0)
             break;
 
-        whine(
-            "'%s' has unexpected extra content",
-            path
-        );
-        return did_whine;
+        result->out.status = s_unexpected_extra_content;
+        errno = 0;
+        return;
     }
 
-    return did_not_whine;
+    errno = 0;
 }
 
 static enum whined whine_if_wrong_text_at_path(
@@ -467,15 +502,17 @@ static enum whined whine_if_wrong_text_at_path(
         )
     );
 
-    enum whined whined;
-    whined = whine_if_wrong_text_at_fd(
+    struct result result;
+    has_expected_text_at_fd(
         path,
         fd,
-        expected
+        expected,
+        &result
     );
 
     int status = close(fd);
     e = errno;
+    enum whined whined = whine_result(result);
     RETURN_IF_WHINED(
         require(
             status == 0,
@@ -807,9 +844,9 @@ enum whined main_check_lock_fd(
         )
     );
 
-    RETURN_IF_WHINED(
-        whine_if_wrong_text_at_fd(lock_path, lock_fd, "")
-    );
+    struct result result;
+    has_expected_text_at_fd(lock_path, lock_fd, "", &result);
+    RETURN_IF_WHINED(whine_result(result));
 
     char* const argv[] = {
         "./runme",
