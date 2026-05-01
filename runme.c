@@ -13,37 +13,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static enum whined whine_if_host_unsupported(void) {
-    struct utsname uts;
-    RETURN_IF_WHINED(
-        require(
-            uname(&uts) == 0, 
-            did_whine, 
-            "uname failed"
-        )
-    );
-
-    RETURN_IF_WHINED(
-        require(
-            strcmp(uts.machine, "x86_64") == 0, 
-            did_whine, 
-            "we only support x86_64 hosts for now, not '%s'",
-            uts.machine
-        )
-    );
-
-    RETURN_IF_WHINED(
-        require(
-            strcmp(uts.sysname, "Linux") == 0,
-            did_whine,
-            "we only support Linux hosts for now, not '%s'",
-            uts.sysname
-        )
-    );
-
-    return did_not_whine;
-}
-
 static bool is_fd_open(int fd) {
     errno = 0;
     if (fcntl(fd, F_GETFD) >= 0)
@@ -774,7 +743,33 @@ int main(int argc, char** argv) {
         )
     );
 
-    RETURN_IF_WHINED(whine_if_host_unsupported());
+    struct utsname uts;
+    RETURN_IF_WHINED(
+        require(
+            uname(&uts) == 0,
+            did_whine,
+            "uname failed"
+        )
+    );
+
+    RETURN_IF_WHINED(
+        require(
+            strcmp(uts.machine, "x86_64") == 0,
+            did_whine,
+            "we only support x86_64 hosts for now, not '%s'",
+            uts.machine
+        )
+    );
+
+    RETURN_IF_WHINED(
+        require(
+            strcmp(uts.sysname, "Linux") == 0,
+            did_whine,
+            "we only support Linux hosts for now, not '%s'",
+            uts.sysname
+        )
+    );
+
     RETURN_IF_WHINED(whine_if_standard_fd_missing());
 
     enum { buffer_size = 65536, };
