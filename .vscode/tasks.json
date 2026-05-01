@@ -12,6 +12,9 @@
                 "kind": "build",
                 "isDefault": true
             },
+            "presentation": {
+                "showReuseMessage": false
+            },
             "problemMatcher": "$gcc"
         }
     ]
