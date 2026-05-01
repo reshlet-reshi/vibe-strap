@@ -37,7 +37,7 @@ inline_std() {
         exit 2
     fi
 
-    std_file="./src/std/$1.sh"
+    std_file="./src/sh/std/$1.sh"
     if ! test -f "$std_file"; then
         printf '%s\n' "standard inline file '${std_file}' not found" >&2
         exit 1
