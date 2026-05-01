@@ -1,8 +1,9 @@
 #define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
+#include "src/c/whine.h"
+
 #include <errno.h>
 #include <fcntl.h>
-#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,59 +12,6 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <unistd.h>
-
-static const char* our_name = "runme";
-
-static void vwhine(const char* format, va_list args) {
-    fprintf(stderr, "%s: ", our_name);
-    vfprintf(stderr, format, args);
-    fprintf(stderr, "\n");
-}
-
-static void whine(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    vwhine(format, args);
-    va_end(args);
-}
-
-enum whined {
-    did_not_whine,
-    did_whine,
-};
-
-static enum whined vrequire(
-    bool cond,
-    enum whined complaint,
-    const char* format,
-    va_list args
-) {
-    if (cond)
-        return did_not_whine;
-
-    vwhine(format, args);
-    return complaint;
-}
-
-static enum whined require(
-    bool cond, 
-    enum whined complaint, 
-    const char* format, 
-    ...
-) {
-    va_list args;
-    va_start(args, format);
-    enum whined whined = vrequire(cond, complaint, format, args);
-    va_end(args);
-
-    return whined;
-}
-
-#define RETURN_IF_WHINED(whined)        \
-    do {                                \
-        if ((whined) != did_not_whine)  \
-            return (whined);            \
-    } while (0)
 
 static enum whined parse_args_or_whine(int argc, char** argv) {
     RETURN_IF_WHINED(
@@ -76,7 +24,7 @@ static enum whined parse_args_or_whine(int argc, char** argv) {
         )
     );
 
-    our_name = argv[0];
+    set_whine_name(argv[0]);
 
     RETURN_IF_WHINED(
         require(

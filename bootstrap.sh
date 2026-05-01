@@ -22,7 +22,7 @@ muslcc_archive="./vendor/muslcc/x86_64-linux-musl-cross.tgz"
 tar -xzf "$muslcc_archive" -C "${tmp}"
 
 cc="${tmp}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-cc"
-"$cc" -static -o ./runme ./runme.c
+"$cc" -static -o ./runme ./runme.c ./src/c/*.c
 
 cleanup
 trap - EXIT HUP INT TERM
