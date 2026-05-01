@@ -24,7 +24,11 @@ enum whined {
     did_whine,
 };
 
-static enum whined vwhine_if(bool cond, const char* format, va_list args) {
+static enum whined vwhine_if(
+    bool cond,
+    const char* format,
+    va_list args
+) {
     if (!cond)
         return did_not_whine;
 
@@ -49,18 +53,20 @@ static enum whined whine_if(bool cond, const char* format, ...) {
 }
 
 #define RETURN_IF_WHINED(whined, ret)   \
-    if (whined == did_whine)            \
-        return ret;
+    do {                                \
+        if ((whined) == did_whine)      \
+            return (ret);               \
+    } while (0)
 
 static enum whined parse_args_or_whine(int argc, char** argv) {
     RETURN_IF_WHINED(
         whine_if(
-            argc < 1 || argv[0] == NULL, 
+            argc < 1 || argv[0] == NULL,
             "missing program name"
         ),
         did_whine
-    )
-    
+    );
+
     our_name = argv[0];
 
     RETURN_IF_WHINED(
@@ -70,7 +76,7 @@ static enum whined parse_args_or_whine(int argc, char** argv) {
             argc - 1
         ),
         did_whine
-    )
+    );
 
     return did_not_whine;
 }
@@ -141,10 +147,14 @@ static enum whined whine_if_standard_fd_missing(void) {
     return whined;
 }
 
-static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
+static enum whined cd_to_self_or_whine(
+    char* buffer,
+    size_t buffer_size
+) {
     if (buffer == NULL || buffer_size <= 1) {
         whine(
-            "internal error: invalid buffer passed to cd_to_self_or_whine"
+            "internal error: "
+            "invalid buffer passed to cd_to_self_or_whine"
         );
         return did_whine;
     }
@@ -218,7 +228,10 @@ static enum whined cd_to_self_or_whine(char* buffer, size_t buffer_size) {
     return did_not_whine;
 }
 
-static enum whined whine_if_distinct_files(const char* a, const char* b) {
+static enum whined whine_if_distinct_files(
+    const char* a,
+    const char* b
+) {
     struct stat a_stat;
     if (stat(a, &a_stat) != 0) {
         int e = errno;
@@ -233,7 +246,9 @@ static enum whined whine_if_distinct_files(const char* a, const char* b) {
         return did_whine;
     }
 
-    if (a_stat.st_dev != b_stat.st_dev || a_stat.st_ino != b_stat.st_ino) {
+    if (a_stat.st_dev != b_stat.st_dev ||
+        a_stat.st_ino != b_stat.st_ino
+    ) {
         whine("'%s' and '%s' are not the same file", a, b);
         return did_whine;
     }
@@ -276,20 +291,31 @@ static enum fs_blob_status fs_blob_status(
 
 static enum whined whine_if_not_fs_blob(const char* path) {
     if (!path) {
-        whine("internal error: null path passed to whine_if_not_fs_blob");
+        whine(
+            "internal error: "
+            "null path passed to whine_if_not_fs_blob"
+        );
         return did_whine;
     }
 
     int error;
-    enum fs_blob_status blob_stat = fs_blob_status(path, &error);
+    enum fs_blob_status blob_stat;
+    blob_stat = fs_blob_status(path, &error);
 
     if (blob_stat == fs_blob_exists)
         return did_not_whine;
 
     if (blob_stat == fs_blob_stat_error) {
-        whine("stat('%s') failed: %s", path, strerror(error));
+        whine(
+            "stat('%s') failed: %s",
+            path,
+            strerror(error)
+        );
     } else if (blob_stat == fs_blob_wrong_mode) {
-        whine("'%s' is not a regular file", path);
+        whine(
+            "'%s' is not a regular file",
+            path
+        );
     } else {
         whine(
             "internal error: unexpected fs_blob_status '%d'.\n"
@@ -311,42 +337,67 @@ static enum whined whine_if_wrong_text_in_file(
         if (ch == EOF) {
             if (ferror(file)) {
                 int e = errno;
-                whine("fgetc('%s') failed: %s", path, strerror(e));
+                whine(
+                    "fgetc('%s') failed: %s",
+                    path,
+                    strerror(e)
+                );
             } else {
-                whine("'%s' ended before expected content", path);
+                whine(
+                    "'%s' ended before expected content",
+                    path
+                );
             }
             return did_whine;
         }
 
         if ((char)ch != expected[i]) {
-            whine("'%s' does not contain the expected content", path);
+            whine(
+                "'%s' does not contain the expected content",
+                path
+            );
             return did_whine;
         }
     }
 
     int ch = fgetc(file);
     if (ch != EOF) {
-        whine("'%s' has unexpected extra content", path);
+        whine(
+            "'%s' has unexpected extra content",
+            path
+        );
         return did_whine;
     }
     if (ferror(file)) {
         int e = errno;
-        whine("fgetc('%s') failed: %s", path, strerror(e));
+        whine(
+            "fgetc('%s') failed: %s",
+            path,
+            strerror(e)
+        );
         return did_whine;
     }
 
     return did_not_whine;
 }
 
-static enum whined whine_if_wrong_text_at_path(const char* path, const char* expected) {
+static enum whined whine_if_wrong_text_at_path(
+    const char* path,
+    const char* expected
+) {
     FILE* file = fopen(path, "rb");
     if (file == NULL) {
         int e = errno;
-        whine("fopen('%s') failed: %s", path, strerror(e));
+        whine(
+            "fopen('%s') failed: %s",
+            path,
+            strerror(e)
+        );
         return did_whine;
     }
 
-    enum whined whined = whine_if_wrong_text_in_file(
+    enum whined whined;
+    whined = whine_if_wrong_text_in_file(
         path,
         file,
         expected
@@ -354,7 +405,11 @@ static enum whined whine_if_wrong_text_at_path(const char* path, const char* exp
 
     if (fclose(file) != 0) {
         int e = errno;
-        whine("fclose('%s') failed: %s", path, strerror(e));
+        whine(
+            "fclose('%s') failed: %s",
+            path,
+            strerror(e)
+        );
         return did_whine;
     }
 
@@ -397,7 +452,7 @@ static enum whined dup2_or_whine(
 }
 
 #define DUP2_OR_WHINE(value, target) \
-    dup2_or_whine(#value, value, #target, target)
+    dup2_or_whine(#value, (value), #target, (target))
 
 static void die(void) {
     _exit(EXIT_FAILURE);
@@ -429,7 +484,7 @@ static enum whined whine_if_command_fails(char* const argv[]) {
 
         // NOTE this check is mostly redundant, since we
         //  whine_if_standard_fd_missing above, so null_fd >= 3
-        //  at this point. But, in esoteric multi threading/etc cases,
+        //  at this point. But, in esoteric threaded cases,
         //  we could get surprised, so check anyway.
         if (is_standard_fd(null_fd)) {
             whine("'/dev/null' opened as standard fd");
@@ -453,8 +508,9 @@ static enum whined whine_if_command_fails(char* const argv[]) {
         if (waitpid(pid, &status, 0) >= 0)
             break;
 
-        // We may get interrupted by a signal while waiting on our child.
-        // If that happens, just wait again.
+        // We may get interrupted by a signal while
+        // waiting on our child. If that happens,
+        // just wait again.
         if (errno == EINTR)
             continue;
 
@@ -468,12 +524,20 @@ static enum whined whine_if_command_fails(char* const argv[]) {
         if (code == 0)
             return did_not_whine;
 
-        whine("'%s' exited with status %d", argv[0], code);
+        whine(
+            "'%s' exited with status %d",
+            argv[0],
+            code
+        );
         return did_whine;
     }
 
     if (WIFSIGNALED(status)) {
-        whine("'%s' was killed by signal %d", argv[0], WTERMSIG(status));
+        whine(
+            "'%s' was killed by signal %d",
+            argv[0],
+            WTERMSIG(status)
+        );
         return did_whine;
     }
 
@@ -508,77 +572,82 @@ static enum whined mkdir_or_whine(const char* path) {
 
     int e = errno;
     if (e != EEXIST) {
-        whine("mkdir('%s') failed: %s", path, strerror(e));
+        whine(
+            "mkdir('%s') failed: %s",
+            path,
+            strerror(e)
+        );
         return did_whine;
     }
 
     struct stat st;
     if (stat(path, &st) != 0) {
         e = errno;
-        whine("stat('%s') failed: %s", path, strerror(e));
+        whine(
+            "stat('%s') failed: %s",
+            path,
+            strerror(e)
+        );
         return did_whine;
     }
 
     if (!S_ISDIR(st.st_mode)) {
-        whine("'%s' is not a directory", path);
+        whine(
+            "'%s' is not a directory",
+            path
+        );
         return did_whine;
     }
 
     return did_not_whine;
 }
 
-int main(int argc, char** argv) {
-    if (parse_args_or_whine(argc, argv) == did_whine)
-        return EXIT_FAILURE;
-    if (whine_if_host_unsupported() == did_whine)
-        return EXIT_FAILURE;
+#define FAIL_IF_WHINED(whined)          \
+    do {                                \
+        if ((whined) == did_whine)      \
+            return EXIT_FAILURE;        \
+    } while (0)
 
-    if (whine_if_standard_fd_missing() == did_whine)
-        return EXIT_FAILURE;
+int main(int argc, char** argv) {
+    FAIL_IF_WHINED(parse_args_or_whine(argc, argv));
+    FAIL_IF_WHINED(whine_if_host_unsupported());
+    FAIL_IF_WHINED(whine_if_standard_fd_missing());
 
     enum { buffer_size = 65536, };
     char* buffer = malloc(buffer_size);
-    if (!buffer) {
-        whine("out of memory");
-        return EXIT_FAILURE;
-    }
+    FAIL_IF_WHINED(whine_if(!buffer, "out of memory"));
 
-    enum whined cd_whined = cd_to_self_or_whine(buffer, buffer_size);
+    enum whined whined;
+    whined = cd_to_self_or_whine(buffer, buffer_size);
     free(buffer);
-    if (cd_whined == did_whine)
-        return EXIT_FAILURE;
+    FAIL_IF_WHINED(whined);
 
-    if (whine_if_not_fs_blob("./runme") == did_whine)
-        return EXIT_FAILURE;
-    if (whine_if_distinct_files("/proc/self/exe", "./runme") == did_whine)
-        return EXIT_FAILURE;
-
-    if (whine_if_not_fs_blob("./runme.c") == did_whine)
-        return EXIT_FAILURE;
-    if (whine_if_not_fs_blob("./.gitignore") == did_whine)
-        return EXIT_FAILURE;
-
-    static const char expected_gitignore[] =
-        ".ignore/\n"
-        "runme\n"
-        ".codex\n";
-
-    enum whined gitignore_whined = whine_if_wrong_text_at_path(
-        "./.gitignore",
-        expected_gitignore
+    FAIL_IF_WHINED(whine_if_not_fs_blob("./runme"));
+    FAIL_IF_WHINED(
+        whine_if_distinct_files(
+            "/proc/self/exe",
+            "./runme"
+        )
     );
-    if (gitignore_whined == did_whine)
-        return EXIT_FAILURE;
 
-    if (whine_if_file_untracked("runme.c") == did_whine)
-        return EXIT_FAILURE;
-    if (whine_if_file_untracked(".gitignore") == did_whine)
-        return EXIT_FAILURE;
+    FAIL_IF_WHINED(whine_if_not_fs_blob("./runme.c"));
+    FAIL_IF_WHINED(whine_if_not_fs_blob("./.gitignore"));
 
-    if (mkdir_or_whine("./.ignore") == did_whine)
-        return EXIT_FAILURE;
-    if (mkdir_or_whine("./.ignore/.cache") == did_whine)
-        return EXIT_FAILURE;
+    FAIL_IF_WHINED(
+        whine_if_wrong_text_at_path(
+            "./.gitignore",
+
+            ".ignore/\n"
+            "runme\n"
+            ".codex\n"
+        )
+    );
+
+    FAIL_IF_WHINED(whine_if_file_untracked("runme.c"));
+    FAIL_IF_WHINED(whine_if_file_untracked(".gitignore"));
+
+    FAIL_IF_WHINED(mkdir_or_whine("./.ignore"));
+    FAIL_IF_WHINED(mkdir_or_whine("./.ignore/.cache"));
 
     puts("OK");
     return EXIT_SUCCESS;
