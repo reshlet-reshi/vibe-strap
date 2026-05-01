@@ -525,7 +525,18 @@ static void die_if_whined(enum whined whined) {
     die();
 }
 
-static enum whined whine_if_command_fails(char* const argv[]) {
+static enum whined run_command_or_whine(
+    char* const argv[],
+    int* p_exit_code
+) {
+    if (!p_exit_code) {
+        whine(
+            "internal error: "
+            "null p_exit_code passed to run_command_or_whine"
+        );
+        return did_whine;
+    }
+
     pid_t pid = fork();
     if (pid < 0) {
         int e = errno;
@@ -580,16 +591,8 @@ static enum whined whine_if_command_fails(char* const argv[]) {
     }
 
     if (WIFEXITED(status)) {
-        int code = WEXITSTATUS(status);
-        if (code == 0)
-            return did_not_whine;
-
-        whine(
-            "'%s' exited with status %d",
-            argv[0],
-            code
-        );
-        return did_whine;
+        *p_exit_code = WEXITSTATUS(status);
+        return did_not_whine;
     }
 
     if (WIFSIGNALED(status)) {
@@ -615,8 +618,17 @@ static enum whined whine_if_file_untracked(char* path) {
         NULL
     };
 
-    if (whine_if_command_fails(argv) == did_not_whine)
-        return did_not_whine;
+    int exit_code;
+    if (run_command_or_whine(argv, &exit_code) == did_not_whine) {
+        if (exit_code == 0)
+            return did_not_whine;
+
+        whine(
+            "'%s' exited with status %d",
+            argv[0],
+            exit_code
+        );
+    }
 
     whine(
         "could not verify '%s' is tracked by git",
