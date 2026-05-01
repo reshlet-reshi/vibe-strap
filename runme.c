@@ -16,6 +16,7 @@
 enum {
     s_ok,
     s_invalid_buffer,
+    s_null_path,
     s_open_failed,
     s_fcntl_failed,
     s_fd_not_open,
@@ -26,6 +27,7 @@ enum {
     s_readlink_empty,
     s_no_directory_component,
     s_chdir_failed,
+    s_close_failed,
 };
 
 struct result {
@@ -46,6 +48,8 @@ struct result {
     } out;
 };
 
+enum { is_path_regular_file_result_count = 2 };
+
 static enum whined whine_result(struct result result) {
     switch (result.out.status) {
     case s_ok:
@@ -57,6 +61,14 @@ static enum whined whine_result(struct result result) {
             did_whine,
             "internal error: "
             "invalid buffer passed to cd_to_self"
+        );
+
+    case s_null_path:
+        return require(
+            false,
+            did_whine,
+            "internal error: "
+            "null path passed to is_path_regular_file"
         );
 
     case s_open_failed:
@@ -146,6 +158,15 @@ static enum whined whine_result(struct result result) {
             result.in_out.buffer,
             strerror(result.out.sys_error)
         );
+
+    case s_close_failed:
+        return require(
+            false,
+            did_whine,
+            "close('%s') failed: %s",
+            result.in.path,
+            strerror(result.out.sys_error)
+        );
     }
 
     return require(
@@ -156,66 +177,82 @@ static enum whined whine_result(struct result result) {
     );
 }
 
-static struct result is_fd_open(const char* path, int fd) {
-    struct result result = {0};
-    result.in.path = path;
-    result.in.fd = fd;
-    result.out.fd = -1;
+static enum whined whine_results(
+    const struct result (*results)[is_path_regular_file_result_count]
+) {
+    enum whined whined = did_not_whine;
+    for (size_t i = 0; i < is_path_regular_file_result_count; ++i) {
+        if (whine_result((*results)[i]) == did_whine)
+            whined = did_whine;
+    }
+
+    return whined;
+}
+
+static void is_fd_open(
+    const char* path,
+    int fd,
+    struct result* result
+) {
+    *result = (struct result) {0};
+    result->in.path = path;
+    result->in.fd = fd;
+    result->out.fd = -1;
 
     errno = 0;
     if (fcntl(fd, F_GETFD) >= 0)
-        result.out.status = s_ok;
+        result->out.status = s_ok;
     else if (errno == EBADF)
-        result.out.status = s_fd_not_open;
+        result->out.status = s_fd_not_open;
     else {
-        result.out.status = s_fcntl_failed;
-        result.out.sys_error = errno;
+        result->out.status = s_fcntl_failed;
+        result->out.sys_error = errno;
     }
 
     errno = 0;
-    return result;
 }
 
-static struct result cd_to_self(
+static void cd_to_self(
     char* buffer,
-    size_t buffer_size
+    size_t buffer_size,
+    struct result* result
 ) {
-    struct result result = {0};
-    result.in.path = "/proc/self/exe";
-    result.in.buffer_size = buffer_size;
-    result.in_out.buffer = buffer;
-    result.out.fd = -1;
+    *result = (struct result) {0};
+    result->in.path = "/proc/self/exe";
+    result->in.buffer_size = buffer_size;
+    result->in_out.buffer = buffer;
+    result->out.fd = -1;
 
     if (buffer == NULL || buffer_size <= 1) {
-        result.out.status = s_invalid_buffer;
-        return result;
+        result->out.status = s_invalid_buffer;
+        return;
     }
 
     // readlink does not null terminate,
     //  so reserve one byte in the buffer.
-    size_t read_size = result.in.buffer_size - 1;
+    size_t read_size = result->in.buffer_size - 1;
 
-    ssize_t length = readlink(result.in.path, buffer, read_size);
+    ssize_t length = readlink(result->in.path, buffer, read_size);
     if (length < 0) {
-        result.out.status = s_readlink_failed;
-        result.out.sys_error = errno;
+        result->out.status = s_readlink_failed;
+        result->out.sys_error = errno;
         errno = 0;
-        return result;
+        return;
     }
 
     // null terminate
     buffer[length] = '\0';
 
     if ((size_t)length >= read_size) {
-        result.out.status = s_readlink_truncated;
+        result->out.status = s_readlink_truncated;
         errno = 0;
-        return result;
+        return;
     }
 
     if (length == 0) {
-        result.out.status = s_readlink_empty;
+        result->out.status = s_readlink_empty;
         errno = 0;
-        return result;
+        return;
     }
 
     char* last_slash = &buffer[length - 1];
@@ -226,89 +263,95 @@ static struct result cd_to_self(
     }
 
     if (*last_slash != '/') {
-        result.out.status = s_no_directory_component;
+        result->out.status = s_no_directory_component;
         errno = 0;
-        return result;
+        return;
     }
 
     // drop the basename
     *(last_slash + 1) = '\0';
 
     if (chdir(buffer) < 0) {
-        result.out.status = s_chdir_failed;
-        result.out.sys_error = errno;
+        result->out.status = s_chdir_failed;
+        result->out.sys_error = errno;
         errno = 0;
-        return result;
+        return;
     }
 
     errno = 0;
-    return result;
 }
 
-static struct result is_fd_regular_file(const char* path, int fd) {
-    struct result result = {0};
-    result.in.path = path;
-    result.in.fd = fd;
-    result.out.fd = -1;
+static void is_fd_regular_file(
+    const char* path,
+    int fd,
+    struct result* result
+) {
+    *result = (struct result) {0};
+    result->in.path = path;
+    result->in.fd = fd;
+    result->out.fd = -1;
 
     struct stat st;
     if (fstat(fd, &st) < 0) {
-        result.out.status = s_fstat_failed;
-        result.out.sys_error = errno;
+        result->out.status = s_fstat_failed;
+        result->out.sys_error = errno;
     } else if (!S_ISREG(st.st_mode)) {
-        result.out.status = s_not_regular_file;
+        result->out.status = s_not_regular_file;
     }
 
     errno = 0;
-    return result;
 }
 
-static struct result open_path_fd(const char* path) {
-    struct result result = {0};
-    result.in.path = path;
-    result.in.fd = -1;
-    result.out.fd = open(path, O_PATH | O_CLOEXEC);
+static void open_path_fd(const char* path, struct result* result) {
+    *result = (struct result) {0};
+    result->in.path = path;
+    result->in.fd = -1;
+    result->out.fd = open(path, O_PATH | O_CLOEXEC);
 
-    if (result.out.fd < 0) {
-        result.out.status = s_open_failed;
-        result.out.sys_error = errno;
+    if (result->out.fd < 0) {
+        result->out.status = s_open_failed;
+        result->out.sys_error = errno;
     }
 
     errno = 0;
-    return result;
 }
 
-static enum whined whine_if_not_fs_blob_path(const char* path) {
-    RETURN_IF_WHINED(
-        require(
-            path != NULL,
-            did_whine,
-            "internal error: "
-            "null path passed to whine_if_not_fs_blob_path"
-        )
-    );
+static void is_path_regular_file(
+    const char* path,
+    struct result (*results)[is_path_regular_file_result_count]
+) {
+    (*results)[0] = (struct result) {0};
+    (*results)[0].in.path = path;
+    (*results)[0].in.fd = -1;
+    (*results)[0].out.fd = -1;
+    (*results)[1] = (struct result) {0};
+    (*results)[1].in.path = path;
+    (*results)[1].in.fd = -1;
+    (*results)[1].out.fd = -1;
 
-    struct result opened = open_path_fd(path);
-    RETURN_IF_WHINED(whine_result(opened));
+    if (path == NULL) {
+        (*results)[0].out.status = s_null_path;
+        return;
+    }
 
-    int fd = opened.out.fd;
-    enum whined whined = whine_result(
-        is_fd_regular_file(path, fd)
-    );
+    open_path_fd(path, &(*results)[0]);
+    if ((*results)[0].out.status != s_ok)
+        return;
+
+    int fd = (*results)[0].out.fd;
+    is_fd_regular_file(path, fd, &(*results)[0]);
 
     int status = close(fd);
     int e = errno;
-    RETURN_IF_WHINED(
-        require(
-            status == 0,
-            did_whine,
-            "close('%s') failed: %s", 
-            path, 
-            strerror(e)
-        )
-    );
+    if (status != 0) {
+        (*results)[1].in.path = path;
+        (*results)[1].in.fd = fd;
+        (*results)[1].out.fd = -1;
+        (*results)[1].out.status = s_close_failed;
+        (*results)[1].out.sys_error = e;
+    }
 
-    return whined;
+    errno = 0;
 }
 
 static enum whined whine_if_wrong_text_at_fd(
@@ -516,15 +559,15 @@ static enum whined run_command_or_whine(
     );
 
     if (pid == 0) {
-        die_if_whined(
-            whine_result(is_fd_open("STDIN_FILENO", STDIN_FILENO))
-        );
-        die_if_whined(
-            whine_result(is_fd_open("STDOUT_FILENO", STDOUT_FILENO))
-        );
-        die_if_whined(
-            whine_result(is_fd_open("STDERR_FILENO", STDERR_FILENO))
-        );
+        struct result result;
+        is_fd_open("STDIN_FILENO", STDIN_FILENO, &result);
+        die_if_whined(whine_result(result));
+
+        is_fd_open("STDOUT_FILENO", STDOUT_FILENO, &result);
+        die_if_whined(whine_result(result));
+
+        is_fd_open("STDERR_FILENO", STDERR_FILENO, &result);
+        die_if_whined(whine_result(result));
 
         int null_fd = open("/dev/null", O_WRONLY);
         die_if_whined(
@@ -715,9 +758,9 @@ static enum whined open_blob_or_whine(
         );
     }
 
-    enum whined whined = whine_result(
-        is_fd_regular_file(path, fd)
-    );
+    struct result result;
+    is_fd_regular_file(path, fd, &result);
+    enum whined whined = whine_result(result);
     if (whined == did_whine) {
         int status = close(fd);
         e = errno;
@@ -828,26 +871,29 @@ int main(int argc, char** argv) {
         )
     );
 
-    RETURN_IF_WHINED(
-        whine_result(is_fd_open("STDIN_FILENO", STDIN_FILENO))
-    );
-    RETURN_IF_WHINED(
-        whine_result(is_fd_open("STDOUT_FILENO", STDOUT_FILENO))
-    );
-    RETURN_IF_WHINED(
-        whine_result(is_fd_open("STDERR_FILENO", STDERR_FILENO))
-    );
+    struct result result;
+    is_fd_open("STDIN_FILENO", STDIN_FILENO, &result);
+    RETURN_IF_WHINED(whine_result(result));
+
+    is_fd_open("STDOUT_FILENO", STDOUT_FILENO, &result);
+    RETURN_IF_WHINED(whine_result(result));
+
+    is_fd_open("STDERR_FILENO", STDERR_FILENO, &result);
+    RETURN_IF_WHINED(whine_result(result));
 
     enum { buffer_size = 65536, };
     char* buffer = malloc(buffer_size);
     RETURN_IF_WHINED(require(buffer, did_whine, "out of memory"));
 
     enum whined whined;
-    whined = whine_result(cd_to_self(buffer, buffer_size));
+    cd_to_self(buffer, buffer_size, &result);
+    whined = whine_result(result);
     free(buffer);
     RETURN_IF_WHINED(whined);
 
-    RETURN_IF_WHINED(whine_if_not_fs_blob_path("./runme"));
+    struct result path_results[is_path_regular_file_result_count];
+    is_path_regular_file("./runme", &path_results);
+    RETURN_IF_WHINED(whine_results(&path_results));
     {
         const char* a = "/proc/self/exe";
         const char* b = "./runme";
@@ -890,8 +936,11 @@ int main(int argc, char** argv) {
         );
     }
 
-    RETURN_IF_WHINED(whine_if_not_fs_blob_path("./runme.c"));
-    RETURN_IF_WHINED(whine_if_not_fs_blob_path("./.gitignore"));
+    is_path_regular_file("./runme.c", &path_results);
+    RETURN_IF_WHINED(whine_results(&path_results));
+
+    is_path_regular_file("./.gitignore", &path_results);
+    RETURN_IF_WHINED(whine_results(&path_results));
 
     RETURN_IF_WHINED(
         whine_if_wrong_text_at_path(
