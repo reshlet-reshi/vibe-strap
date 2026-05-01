@@ -25,12 +25,12 @@ enum whined {
     did_whine,
 };
 
-static enum whined vwhine_if(
+static enum whined vwhine_if_not(
     bool cond,
     const char* format,
     va_list args
 ) {
-    if (!cond)
+    if (cond)
         return did_not_whine;
 
     vwhine(format, args);
@@ -40,14 +40,14 @@ static enum whined vwhine_if(
 static void whine(const char* format, ...) {
     va_list args;
     va_start(args, format);
-    vwhine_if(true, format, args);
+    vwhine_if_not(false, format, args);
     va_end(args);
 }
 
-static enum whined whine_if(bool cond, const char* format, ...) {
+static enum whined whine_if_not(bool cond, const char* format, ...) {
     va_list args;
     va_start(args, format);
-    enum whined whined = vwhine_if(cond, format, args);
+    enum whined whined = vwhine_if_not(cond, format, args);
     va_end(args);
 
     return whined;
@@ -61,9 +61,11 @@ static enum whined whine_if(bool cond, const char* format, ...) {
 
 static enum whined parse_args_or_whine(int argc, char** argv) {
     RETURN_IF_WHINED(
-        whine_if(
-            argc < 1 || argv[0] == NULL,
-            "missing program name"
+        whine_if_not(
+            (argc >= 1) && (argv[0] != NULL),
+            "missing program name: argc (%d), argv[0] (%p)",
+            argc,
+            argv[0]
         ),
         did_whine
     );
@@ -71,8 +73,8 @@ static enum whined parse_args_or_whine(int argc, char** argv) {
     our_name = argv[0];
 
     RETURN_IF_WHINED(
-        whine_if(
-            argc != 1,
+        whine_if_not(
+            argc == 1,
             "expected no arguments, got %d",
             argc - 1
         ),
@@ -761,8 +763,8 @@ enum whined main_check_lock_fd(
 
     // XXX this does not distinguish all the different ways it can fail...
 
-    return whine_if(
-        exit_code != EXIT_FAILURE, 
+    return whine_if_not(
+        exit_code == EXIT_FAILURE, 
         "child process did not fail like we expected"
     );
 }
@@ -780,7 +782,7 @@ int main(int argc, char** argv) {
 
     enum { buffer_size = 65536, };
     char* buffer = malloc(buffer_size);
-    FAIL_IF_WHINED(whine_if(!buffer, "out of memory"));
+    FAIL_IF_WHINED(whine_if_not(buffer, "out of memory"));
 
     enum whined whined;
     whined = cd_to_self_or_whine(buffer, buffer_size);
