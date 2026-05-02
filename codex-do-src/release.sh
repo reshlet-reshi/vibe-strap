@@ -20,6 +20,50 @@ usage() {
     printf '  --project-only  skip external release; commit and push only this project repo\n' >&2
 }
 
+require_origin_up_to_date() {
+    repo_dir=$1
+    repo_label=$2
+
+    branch=$(git -C "$repo_dir" symbolic-ref --quiet --short HEAD) || {
+        printf '%s: refusing to release: %s is not on a branch\n' \
+            "$0" "$repo_label" >&2
+        exit 1
+    }
+    origin_ref=origin/$branch
+
+    git -C "$repo_dir" fetch origin
+    git -C "$repo_dir" rev-parse --verify --quiet "$origin_ref^{commit}" \
+        > /dev/null || {
+        printf '%s: refusing to release: %s has no %s ref\n' \
+            "$0" "$repo_label" "$origin_ref" >&2
+        exit 1
+    }
+
+    local_head=$(git -C "$repo_dir" rev-parse HEAD)
+    origin_head=$(git -C "$repo_dir" rev-parse "$origin_ref")
+    if test "$local_head" = "$origin_head"; then
+        return
+    fi
+
+    merge_base=$(git -C "$repo_dir" merge-base HEAD "$origin_ref") || {
+        printf '%s: refusing to release: %s cannot compare HEAD with %s\n' \
+            "$0" "$repo_label" "$origin_ref" >&2
+        exit 1
+    }
+
+    if test "$merge_base" = "$local_head"; then
+        relation=behind
+    elif test "$merge_base" = "$origin_head"; then
+        relation=ahead
+    else
+        relation=diverged
+    fi
+
+    printf '%s: refusing to release: %s is %s %s\n' \
+        "$0" "$repo_label" "$relation" "$origin_ref" >&2
+    exit 1
+}
+
 while test "$#" -gt 0; do
     case "$1" in
         --project-only)
@@ -129,6 +173,8 @@ if test "$project_only" = false; then
         printf '%s: target directory is not a git repo: %s\n' "$0" "$target_dir" >&2
         exit 1
     fi
+
+    require_origin_up_to_date "$target_dir" "target repo"
 fi
 
 executable_file=$(
