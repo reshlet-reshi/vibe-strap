@@ -49,7 +49,12 @@ workspace_dir=$(CDPATH='' cd -- "$workspace_dir" && pwd -P) || {
     exit 1
 }
 
-endpoint_script="$script_dir/vscode-unpersisted-documents.js"
+workspace_endpoint_script="$workspace_dir/codex-do-src/vscode-unpersisted-documents.js"
+if test -f "$workspace_endpoint_script"; then
+    endpoint_script="$workspace_endpoint_script"
+else
+    endpoint_script="$script_dir/vscode-unpersisted-documents.js"
+fi
 if ! test -f "$endpoint_script"; then
     err "endpoint script not found: $endpoint_script"
     exit 1
