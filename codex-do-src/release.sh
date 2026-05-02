@@ -2,12 +2,12 @@
 set -eu
 
 target_dir="$HOME/codex-do"
-source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+source_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 project_dir=$(git -C "$source_dir" rev-parse --show-toplevel 2> /dev/null) || {
     printf '%s: source directory is not inside a git repo: %s\n' "$0" "$source_dir" >&2
     exit 1
 }
-project_dir=$(CDPATH= cd -- "$project_dir" && pwd -P)
+project_dir=$(CDPATH='' cd -- "$project_dir" && pwd -P)
 source_rel=${source_dir#"$project_dir"/}
 commit_requested=false
 commit_message=
@@ -154,7 +154,7 @@ if test "$project_only" = false; then
         exit 1
     fi
 
-    target_dir=$(CDPATH= cd -- "$target_dir" && pwd -P)
+    target_dir=$(CDPATH='' cd -- "$target_dir" && pwd -P)
     target_base=$(basename -- "$target_dir")
 
     if test "$target_base" != codex-do; then

@@ -13,7 +13,7 @@ fi
 command_name="$1"
 shift
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 
 case "$command_name" in
     query-vscode-unpersisted-documents)
