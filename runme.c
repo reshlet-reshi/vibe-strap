@@ -621,6 +621,7 @@ static enum whined run_command_or_whine(
         if (whined == did_whine)
             _exit(whined);
 
+        // NOTE dup2 does not maintain O_CLOEXEC, which is what we want here.
         sys_open("/dev/null", O_WRONLY | O_CLOEXEC, 0, &result);
         whined = whine_result(result);
         if (whined == did_whine)
