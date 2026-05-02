@@ -5,7 +5,7 @@
         "port": 17817,
         "endpoints": {
             "unpersisted-documents": {
-                "script": "./.vscode/vscode-unpersisted-documents.js"
+                "script": "./codex-do-src/vscode-unpersisted-documents.js"
             }
         }
     }
