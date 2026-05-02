@@ -1,0 +1,12 @@
+{
+    "rest.api": {
+        "autoStart": true,
+        "openInBrowser": false,
+        "port": 17817,
+        "endpoints": {
+            "unpersisted-documents": {
+                "script": "./.vscode/vscode-unpersisted-documents.js"
+            }
+        }
+    }
+}
