@@ -36,33 +36,27 @@ enum {
 };
 
 struct result {
-    struct {
-        const char* path;
-        int fd;
-        int flags;
-        mode_t mode;
-        size_t buffer_size;
-    } in;
+    const char* in_path;
+    int in_fd;
+    int in_flags;
+    mode_t in_mode;
+    size_t in_buffer_size;
 
-    struct {
-        char* buffer;
-    } in_out;
-
-    struct {
-        int status;
-        int sys_error;
-        int fd;
-    } out;
+    char* in_out_buffer;
+    
+    int out_status;
+    int out_sys_error;
+    int out_fd;
 };
 
 static void clear_result(struct result* result) {
     *result = (struct result) {0};
-    result->in.fd = -1;
-    result->out.fd = -1;
+    result->in_fd = -1;
+    result->out_fd = -1;
 }
 
 static enum whined whine_result(struct result result) {
-    switch (result.out.status) {
+    switch (result.out_status) {
     case s_ok:
         return did_not_whine;
 
@@ -87,8 +81,8 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "open('%s') failed: %s",
-            result.in.path,
-            strerror(result.out.sys_error)
+            result.in_path,
+            strerror(result.out_sys_error)
         );
 
     case s_fcntl_failed:
@@ -96,9 +90,9 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "fcntl(%s (%d), F_GETFD) failed: %s",
-            result.in.path,
-            result.in.fd,
-            strerror(result.out.sys_error)
+            result.in_path,
+            result.in_fd,
+            strerror(result.out_sys_error)
         );
 
     case s_fd_not_open:
@@ -106,8 +100,8 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "standard fd %s (%d) is not open",
-            result.in.path,
-            result.in.fd
+            result.in_path,
+            result.in_fd
         );
 
     case s_fstat_failed:
@@ -115,8 +109,8 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "fstat('%s') failed: %s",
-            result.in.path,
-            strerror(result.out.sys_error)
+            result.in_path,
+            strerror(result.out_sys_error)
         );
 
     case s_not_regular_file:
@@ -124,7 +118,7 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "'%s' is not a regular file",
-            result.in.path
+            result.in_path
         );
 
     case s_readlink_failed:
@@ -132,8 +126,8 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "readlink(%s) failed: %s",
-            result.in.path,
-            strerror(result.out.sys_error)
+            result.in_path,
+            strerror(result.out_sys_error)
         );
 
     case s_readlink_truncated:
@@ -141,7 +135,7 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "readlink(%s) returned truncated path",
-            result.in.path
+            result.in_path
         );
 
     case s_readlink_empty:
@@ -149,7 +143,7 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "%s resolved to an empty path",
-            result.in.path
+            result.in_path
         );
 
     case s_no_directory_component:
@@ -157,8 +151,8 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "%s path has no directory component: '%s'",
-            result.in.path,
-            result.in_out.buffer
+            result.in_path,
+            result.in_out_buffer
         );
 
     case s_chdir_failed:
@@ -166,8 +160,8 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "chdir('%s') failed: %s",
-            result.in_out.buffer,
-            strerror(result.out.sys_error)
+            result.in_out_buffer,
+            strerror(result.out_sys_error)
         );
 
     case s_close_failed:
@@ -175,8 +169,8 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "close('%s') failed: %s",
-            result.in.path,
-            strerror(result.out.sys_error)
+            result.in_path,
+            strerror(result.out_sys_error)
         );
 
     case s_lseek_failed:
@@ -184,8 +178,8 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "lseek('%s') failed: %s",
-            result.in.path,
-            strerror(result.out.sys_error)
+            result.in_path,
+            strerror(result.out_sys_error)
         );
 
     case s_read_failed:
@@ -193,8 +187,8 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "read('%s') failed: %s",
-            result.in.path,
-            strerror(result.out.sys_error)
+            result.in_path,
+            strerror(result.out_sys_error)
         );
 
     case s_ended_before_expected_content:
@@ -202,7 +196,7 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "'%s' ended before expected content",
-            result.in.path
+            result.in_path
         );
 
     case s_wrong_content:
@@ -210,7 +204,7 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "'%s' does not contain the expected content",
-            result.in.path
+            result.in_path
         );
 
     case s_unexpected_extra_content:
@@ -218,7 +212,7 @@ static enum whined whine_result(struct result result) {
             false,
             did_whine,
             "'%s' has unexpected extra content",
-            result.in.path
+            result.in_path
         );
     }
 
@@ -226,7 +220,7 @@ static enum whined whine_result(struct result result) {
         false,
         did_whine,
         "internal error: unknown result status %d",
-        result.out.status
+        result.out_status
     );
 }
 
@@ -258,22 +252,22 @@ static void sys_open(
     struct result* result
 ) {
     clear_result(result);
-    result->in.path = path;
-    result->in.flags = flags;
-    result->in.mode = mode;
+    result->in_path = path;
+    result->in_flags = flags;
+    result->in_mode = mode;
 
     bool needs_mode =
-        ((result->in.flags & O_CREAT) == O_CREAT) ||
-        ((result->in.flags & O_TMPFILE) == O_TMPFILE);
+        ((result->in_flags & O_CREAT) == O_CREAT) ||
+        ((result->in_flags & O_TMPFILE) == O_TMPFILE);
 
     if (needs_mode)
-        result->out.fd = open(path, result->in.flags, result->in.mode);
+        result->out_fd = open(path, result->in_flags, result->in_mode);
     else
-        result->out.fd = open(path, result->in.flags);
+        result->out_fd = open(path, result->in_flags);
 
-    if (result->out.fd < 0) {
-        result->out.status = s_open_failed;
-        result->out.sys_error = errno;
+    if (result->out_fd < 0) {
+        result->out_status = s_open_failed;
+        result->out_sys_error = errno;
     }
 
     errno = 0;
@@ -285,17 +279,17 @@ static void is_fd_open(
     struct result* result
 ) {
     clear_result(result);
-    result->in.path = path;
-    result->in.fd = fd;
+    result->in_path = path;
+    result->in_fd = fd;
 
     errno = 0;
     if (fcntl(fd, F_GETFD) >= 0)
-        result->out.status = s_ok;
+        result->out_status = s_ok;
     else if (errno == EBADF)
-        result->out.status = s_fd_not_open;
+        result->out_status = s_fd_not_open;
     else {
-        result->out.status = s_fcntl_failed;
-        result->out.sys_error = errno;
+        result->out_status = s_fcntl_failed;
+        result->out_sys_error = errno;
     }
 
     errno = 0;
@@ -307,23 +301,23 @@ static void cd_to_self(
     struct result* result
 ) {
     clear_result(result);
-    result->in.path = "/proc/self/exe";
-    result->in.buffer_size = buffer_size;
-    result->in_out.buffer = buffer;
+    result->in_path = "/proc/self/exe";
+    result->in_buffer_size = buffer_size;
+    result->in_out_buffer = buffer;
 
     if (buffer == NULL || buffer_size <= 1) {
-        result->out.status = s_invalid_buffer;
+        result->out_status = s_invalid_buffer;
         return;
     }
 
     // readlink does not null terminate,
     //  so reserve one byte in the buffer.
-    size_t read_size = result->in.buffer_size - 1;
+    size_t read_size = result->in_buffer_size - 1;
 
-    ssize_t length = readlink(result->in.path, buffer, read_size);
+    ssize_t length = readlink(result->in_path, buffer, read_size);
     if (length < 0) {
-        result->out.status = s_readlink_failed;
-        result->out.sys_error = errno;
+        result->out_status = s_readlink_failed;
+        result->out_sys_error = errno;
         errno = 0;
         return;
     }
@@ -332,13 +326,13 @@ static void cd_to_self(
     buffer[length] = '\0';
 
     if ((size_t)length >= read_size) {
-        result->out.status = s_readlink_truncated;
+        result->out_status = s_readlink_truncated;
         errno = 0;
         return;
     }
 
     if (length == 0) {
-        result->out.status = s_readlink_empty;
+        result->out_status = s_readlink_empty;
         errno = 0;
         return;
     }
@@ -351,7 +345,7 @@ static void cd_to_self(
     }
 
     if (*last_slash != '/') {
-        result->out.status = s_no_directory_component;
+        result->out_status = s_no_directory_component;
         errno = 0;
         return;
     }
@@ -360,8 +354,8 @@ static void cd_to_self(
     *(last_slash + 1) = '\0';
 
     if (chdir(buffer) < 0) {
-        result->out.status = s_chdir_failed;
-        result->out.sys_error = errno;
+        result->out_status = s_chdir_failed;
+        result->out_sys_error = errno;
         errno = 0;
         return;
     }
@@ -375,15 +369,15 @@ static void is_fd_regular_file(
     struct result* result
 ) {
     clear_result(result);
-    result->in.path = path;
-    result->in.fd = fd;
+    result->in_path = path;
+    result->in_fd = fd;
 
     struct stat st;
     if (fstat(fd, &st) < 0) {
-        result->out.status = s_fstat_failed;
-        result->out.sys_error = errno;
+        result->out_status = s_fstat_failed;
+        result->out_sys_error = errno;
     } else if (!S_ISREG(st.st_mode)) {
-        result->out.status = s_not_regular_file;
+        result->out_status = s_not_regular_file;
     }
 
     errno = 0;
@@ -395,30 +389,30 @@ static void is_path_regular_file(
     struct result* close_result
 ) {
     clear_result(result);
-    result->in.path = path;
+    result->in_path = path;
     clear_result(close_result);
-    close_result->in.path = path;
+    close_result->in_path = path;
 
     if (path == NULL) {
-        result->out.status = s_null_path;
+        result->out_status = s_null_path;
         return;
     }
 
     sys_open(path, O_PATH | O_CLOEXEC, 0, result);
-    if (result->out.status != s_ok)
+    if (result->out_status != s_ok)
         return;
 
-    int fd = result->out.fd;
+    int fd = result->out_fd;
     is_fd_regular_file(path, fd, result);
 
     int status = close(fd);
     int e = errno;
     if (status != 0) {
         clear_result(close_result);
-        close_result->in.path = path;
-        close_result->in.fd = fd;
-        close_result->out.status = s_close_failed;
-        close_result->out.sys_error = e;
+        close_result->in_path = path;
+        close_result->in_fd = fd;
+        close_result->out_status = s_close_failed;
+        close_result->out_sys_error = e;
     }
 
     errno = 0;
@@ -431,8 +425,8 @@ static void has_expected_text_at_fd(
     struct result* result
 ) {
     clear_result(result);
-    result->in.path = path;
-    result->in.fd = fd;
+    result->in_path = path;
+    result->in_fd = fd;
 
     enum { buffer_size = 4096, };
     char buffer[buffer_size];
@@ -440,8 +434,8 @@ static void has_expected_text_at_fd(
     errno = 0;
     off_t offset = lseek(fd, 0, SEEK_SET);
     if (offset != 0) {
-        result->out.status = s_lseek_failed;
-        result->out.sys_error = errno;
+        result->out_status = s_lseek_failed;
+        result->out_sys_error = errno;
         errno = 0;
         return;
     }
@@ -459,20 +453,20 @@ static void has_expected_text_at_fd(
             if (errno == EINTR)
                 continue;
 
-            result->out.status = s_read_failed;
-            result->out.sys_error = errno;
+            result->out_status = s_read_failed;
+            result->out_sys_error = errno;
             errno = 0;
             return;
         }
 
         if (n == 0) {
-            result->out.status = s_ended_before_expected_content;
+            result->out_status = s_ended_before_expected_content;
             errno = 0;
             return;
         }
 
         if (memcmp(buffer, expected + length, (size_t)n) != 0) {
-            result->out.status = s_wrong_content;
+            result->out_status = s_wrong_content;
             errno = 0;
             return;
         }
@@ -486,8 +480,8 @@ static void has_expected_text_at_fd(
             if (errno == EINTR)
                 continue;
 
-            result->out.status = s_read_failed;
-            result->out.sys_error = errno;
+            result->out_status = s_read_failed;
+            result->out_sys_error = errno;
             errno = 0;
             return;
         }
@@ -495,7 +489,7 @@ static void has_expected_text_at_fd(
         if (n == 0)
             break;
 
-        result->out.status = s_unexpected_extra_content;
+        result->out_status = s_unexpected_extra_content;
         errno = 0;
         return;
     }
@@ -510,15 +504,15 @@ static void has_expected_text_at_path(
     struct result* close_result
 ) {
     clear_result(result);
-    result->in.path = path;
+    result->in_path = path;
     clear_result(close_result);
-    close_result->in.path = path;
+    close_result->in_path = path;
 
     sys_open(path, O_RDONLY | O_CLOEXEC, 0, result);
-    if (result->out.status != s_ok)
+    if (result->out_status != s_ok)
         return;
 
-    int fd = result->out.fd;
+    int fd = result->out_fd;
 
     has_expected_text_at_fd(
         path,
@@ -530,9 +524,9 @@ static void has_expected_text_at_path(
     int status = close(fd);
     int e = errno;
     if (status != 0) {
-        close_result->in.fd = fd;
-        close_result->out.status = s_close_failed;
-        close_result->out.sys_error = e;
+        close_result->in_fd = fd;
+        close_result->out_status = s_close_failed;
+        close_result->out_sys_error = e;
     }
 
     errno = 0;
@@ -627,7 +621,7 @@ static enum whined run_command_or_whine(
         if (whined == did_whine)
             _exit(whined);
 
-        int null_fd = result.out.fd;
+        int null_fd = result.out_fd;
 
         // NOTE this check is mostly redundant, since we
         //  checked the standard fds above, so null_fd >= 3 at
@@ -789,10 +783,10 @@ static enum whined open_blob_or_whine(
 
     // mode of 0666 mimics shell
     sys_open(path, O_CREAT | O_EXCL | O_RDWR | O_CLOEXEC, 0666, &result);
-    if (result.out.status != s_ok) {
+    if (result.out_status != s_ok) {
         if (
-            result.out.status != s_open_failed ||
-            result.out.sys_error != EEXIST
+            result.out_status != s_open_failed ||
+            result.out_sys_error != EEXIST
         ) {
             RETURN_IF_WHINED(whine_result(result));
         }
@@ -801,7 +795,7 @@ static enum whined open_blob_or_whine(
         RETURN_IF_WHINED(whine_result(result));
     }
 
-    int fd = result.out.fd;
+    int fd = result.out_fd;
     is_fd_regular_file(path, fd, &result);
     enum whined whined = whine_result(result);
     if (whined == did_whine) {
