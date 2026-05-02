@@ -34,6 +34,31 @@ is not applied to the rule pattern.
 Keep this rule pointed at the released dispatcher outside the project, not at
 the editable source copy in this directory.
 
+## Bootstrapping a fresh clone
+
+From the project root:
+
+```sh
+sh codex-do-src/bootstrap.sh
+```
+
+The bootstrap script copies this directory to `~/codex-do`, checks the local
+tools used by the dispatcher, checks the workspace VS Code REST API settings,
+and prints the Codex approval rule for the released dispatcher.
+
+If VS Code is not answering yet, install/enable the recommended extension
+`mkloubert.vs-rest-api`, open this workspace, reload VS Code, then run:
+
+```sh
+sh codex-do-src/bootstrap.sh --check
+```
+
+For a clone-style smoke test without touching the real home directory:
+
+```sh
+sh codex-do-src/bootstrap.sh --self-test
+```
+
 ## Releasing
 
 Review changes, then release them manually:
