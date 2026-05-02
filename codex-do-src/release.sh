@@ -12,14 +12,19 @@ source_rel=${source_dir#"$project_dir"/}
 commit_requested=false
 commit_message=
 push_requested=false
+project_only=false
 
 usage() {
-    printf 'usage: %s [--commit MESSAGE] [--push]\n' "$0" >&2
-    printf 'installs codex-do source scripts to %s\n' "$target_dir" >&2
+    printf 'usage: %s [--project-only] [--commit MESSAGE] [--push]\n' "$0" >&2
+    printf 'releases codex-do source scripts; external target is %s\n' "$target_dir" >&2
+    printf '  --project-only  skip external release; commit and push only this project repo\n' >&2
 }
 
 while test "$#" -gt 0; do
     case "$1" in
+        --project-only)
+            project_only=true
+            ;;
         --commit)
             if test "$commit_requested" = true; then
                 printf '%s: --commit may only be passed once\n' "$0" >&2
@@ -88,40 +93,42 @@ if test -n "$bad_project_path"; then
     exit 1
 fi
 
-if ! test -e "$target_dir"; then
-    printf '%s: target directory does not exist: %s\n' "$0" "$target_dir" >&2
-    exit 1
-fi
+if test "$project_only" = false; then
+    if ! test -e "$target_dir"; then
+        printf '%s: target directory does not exist: %s\n' "$0" "$target_dir" >&2
+        exit 1
+    fi
 
-if ! test -d "$target_dir"; then
-    printf '%s: target exists but is not a directory: %s\n' \
-        "$0" "$target_dir" >&2
-    exit 1
-fi
+    if ! test -d "$target_dir"; then
+        printf '%s: target exists but is not a directory: %s\n' \
+            "$0" "$target_dir" >&2
+        exit 1
+    fi
 
-if ! test -w "$target_dir"; then
-    printf '%s: target directory is not writable: %s\n' "$0" "$target_dir" >&2
-    exit 1
-fi
+    if ! test -w "$target_dir"; then
+        printf '%s: target directory is not writable: %s\n' "$0" "$target_dir" >&2
+        exit 1
+    fi
 
-target_dir=$(CDPATH= cd -- "$target_dir" && pwd -P)
-target_base=$(basename -- "$target_dir")
+    target_dir=$(CDPATH= cd -- "$target_dir" && pwd -P)
+    target_base=$(basename -- "$target_dir")
 
-if test "$target_base" != codex-do; then
-    printf '%s: target directory basename is not codex-do: %s\n' \
-        "$0" "$target_dir" >&2
-    exit 1
-fi
+    if test "$target_base" != codex-do; then
+        printf '%s: target directory basename is not codex-do: %s\n' \
+            "$0" "$target_dir" >&2
+        exit 1
+    fi
 
-if test "$target_dir" = "$source_dir"; then
-    printf '%s: source and target directories are the same: %s\n' \
-        "$0" "$target_dir" >&2
-    exit 1
-fi
+    if test "$target_dir" = "$source_dir"; then
+        printf '%s: source and target directories are the same: %s\n' \
+            "$0" "$target_dir" >&2
+        exit 1
+    fi
 
-if ! test -d "$target_dir/.git"; then
-    printf '%s: target directory is not a git repo: %s\n' "$0" "$target_dir" >&2
-    exit 1
+    if ! test -d "$target_dir/.git"; then
+        printf '%s: target directory is not a git repo: %s\n' "$0" "$target_dir" >&2
+        exit 1
+    fi
 fi
 
 executable_file=$(
@@ -133,13 +140,17 @@ if test -n "$executable_file"; then
     exit 1
 fi
 
-find "$target_dir" -mindepth 1 -maxdepth 1 ! -name .git \
-    -exec rm -rf -- {} +
+if test "$project_only" = false; then
+    find "$target_dir" -mindepth 1 -maxdepth 1 ! -name .git \
+        -exec rm -rf -- {} +
 
-find "$source_dir" -mindepth 1 -maxdepth 1 ! -name .git \
-    -exec cp -R -- {} "$target_dir/" ';'
+    find "$source_dir" -mindepth 1 -maxdepth 1 ! -name .git \
+        -exec cp -R -- {} "$target_dir/" ';'
 
-printf 'released codex-do scripts to %s\n' "$target_dir"
+    printf 'released codex-do scripts to %s\n' "$target_dir"
+else
+    printf 'skipping external codex-do release\n'
+fi
 
 printf '\nproject git status:\n'
 git -C "$project_dir" status --short --branch
@@ -147,11 +158,13 @@ git -C "$project_dir" status --short --branch
 printf '\nproject git diff stat:\n'
 git -C "$project_dir" diff --stat
 
-printf '\ntarget git status:\n'
-git -C "$target_dir" status --short --branch
+if test "$project_only" = false; then
+    printf '\ntarget git status:\n'
+    git -C "$target_dir" status --short --branch
 
-printf '\ntarget git diff stat:\n'
-git -C "$target_dir" diff --stat
+    printf '\ntarget git diff stat:\n'
+    git -C "$target_dir" diff --stat
+fi
 
 if test "$commit_requested" = true; then
     committed=false
@@ -167,16 +180,18 @@ if test "$commit_requested" = true; then
     printf '\nproject git status after commit:\n'
     git -C "$project_dir" status --short --branch
 
-    git -C "$target_dir" add -A
-    if git -C "$target_dir" diff --cached --quiet; then
-        printf '\nno target changes to commit\n'
-    else
-        git -C "$target_dir" commit -m "$commit_message"
-        committed=true
-    fi
+    if test "$project_only" = false; then
+        git -C "$target_dir" add -A
+        if git -C "$target_dir" diff --cached --quiet; then
+            printf '\nno target changes to commit\n'
+        else
+            git -C "$target_dir" commit -m "$commit_message"
+            committed=true
+        fi
 
-    printf '\ntarget git status after commit:\n'
-    git -C "$target_dir" status --short --branch
+        printf '\ntarget git status after commit:\n'
+        git -C "$target_dir" status --short --branch
+    fi
 
     if test "$committed" = false; then
         printf '%s: --commit requested but there was nothing to commit\n' "$0" >&2
@@ -198,18 +213,22 @@ if test "$push_requested" = true; then
         exit 1
     fi
 
-    if ! git -C "$target_dir" diff --quiet; then
-        printf '%s: refusing to push with unstaged target changes\n' "$0" >&2
-        exit 1
-    fi
-    if ! git -C "$target_dir" diff --cached --quiet; then
-        printf '%s: refusing to push with staged target changes\n' "$0" >&2
-        exit 1
-    fi
-    if test -n "$(git -C "$target_dir" status --short)"; then
-        printf '%s: refusing to push with untracked target files\n' "$0" >&2
-        exit 1
+    if test "$project_only" = false; then
+        if ! git -C "$target_dir" diff --quiet; then
+            printf '%s: refusing to push with unstaged target changes\n' "$0" >&2
+            exit 1
+        fi
+        if ! git -C "$target_dir" diff --cached --quiet; then
+            printf '%s: refusing to push with staged target changes\n' "$0" >&2
+            exit 1
+        fi
+        if test -n "$(git -C "$target_dir" status --short)"; then
+            printf '%s: refusing to push with untracked target files\n' "$0" >&2
+            exit 1
+        fi
     fi
     git -C "$project_dir" push
-    git -C "$target_dir" push
+    if test "$project_only" = false; then
+        git -C "$target_dir" push
+    fi
 fi
