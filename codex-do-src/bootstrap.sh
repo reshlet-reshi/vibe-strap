@@ -107,14 +107,12 @@ check_source_layout() {
             ;;
     esac
 
-    for _file in bootstrap.sh codex-do.sh query-vscode-unpersisted-documents.sh README.md release.sh; do
-        if test -f "$source_dir/$_file"; then
-            say "ok: source has $_file"
-        else
-            err "source file not found: $source_dir/$_file"
-            mark_failed
-        fi
-    done
+    if test -f "$source_dir/codex-do.sh"; then
+        say 'ok: source has codex-do.sh'
+    else
+        err "source dispatcher not found: $source_dir/codex-do.sh"
+        mark_failed
+    fi
 
     _executable_file=$(
         find "$source_dir" -name .git -prune -o -type f -perm /111 -print -quit
@@ -129,33 +127,19 @@ check_source_layout() {
 
 check_workspace_settings() {
     _workspace_dir=$(dirname -- "$source_dir")
-    _settings="$_workspace_dir/.vscode/settings.json"
-    _endpoint_script="$_workspace_dir/.vscode/vscode-unpersisted-documents.js"
-    _extensions="$_workspace_dir/.vscode/extensions.json"
 
     if ! test -d "$_workspace_dir/.vscode"; then
         warn "no .vscode directory beside $source_dir; skipping workspace checks"
         return
     fi
 
-    if test -f "$_settings"; then
-        say 'ok: workspace has .vscode/settings.json'
+    if sh "$source_dir/install-vscode-workspace.sh" \
+        --workspace "$_workspace_dir" \
+        --check
+    then
+        say 'ok: VS Code workspace config is installed'
     else
-        err "workspace settings not found: $_settings"
-        mark_failed
-    fi
-
-    if test -f "$_endpoint_script"; then
-        say 'ok: workspace has VS Code unpersisted-documents endpoint script'
-    else
-        err "VS Code endpoint script not found: $_endpoint_script"
-        mark_failed
-    fi
-
-    if test -f "$_extensions" && grep -q 'mkloubert.vs-rest-api' "$_extensions"; then
-        say 'ok: workspace recommends mkloubert.vs-rest-api'
-    else
-        err 'workspace does not recommend mkloubert.vs-rest-api in .vscode/extensions.json'
+        err 'VS Code workspace config needs install: sh codex-do-src/install-vscode-workspace.sh'
         mark_failed
     fi
 }
@@ -167,14 +151,21 @@ check_target() {
         return
     fi
 
-    for _file in bootstrap.sh codex-do.sh query-vscode-unpersisted-documents.sh README.md release.sh; do
-        if test -f "$target_dir/$_file"; then
-            say "ok: target has $_file"
-        else
-            err "target file not found: $target_dir/$_file"
-            mark_failed
-        fi
-    done
+    if test -f "$target_dir/codex-do.sh"; then
+        say 'ok: target has codex-do.sh'
+    else
+        err "target dispatcher not found: $target_dir/codex-do.sh"
+        mark_failed
+        return
+    fi
+
+    if _diff_output=$(diff -qr --exclude=.git "$source_dir" "$target_dir"); then
+        say 'ok: target matches source'
+    else
+        printf '%s\n' "$_diff_output" >&2
+        err "target is not in sync with source: $target_dir"
+        mark_failed
+    fi
 }
 
 check_vscode_endpoint() {
@@ -247,6 +238,9 @@ install_target() {
         exit 1
     fi
 
+    find "$target_dir" -mindepth 1 -maxdepth 1 ! -name .git \
+        -exec rm -rf -- {} +
+
     find "$source_dir" -mindepth 1 -maxdepth 1 ! -name .git \
         -exec cp -R -- {} "$target_dir/" ';'
 
@@ -256,6 +250,7 @@ install_target() {
 run_checks() {
     check_source_layout
     require_command git
+    require_command python3
     require_command wget
     check_workspace_settings
     check_target
@@ -291,13 +286,6 @@ run_self_test() {
         HOME="$_self_home" \
         sh "$source_dir/bootstrap.sh" --skip-vscode-check \
         > "$_out" 2> "$_err"
-
-    for _file in bootstrap.sh codex-do.sh query-vscode-unpersisted-documents.sh README.md release.sh; do
-        if ! test -f "$_self_home/codex-do/$_file"; then
-            err "self-test expected installed file: $_file"
-            exit 1
-        fi
-    done
 
     CODEX_DO_DIR="$_self_home/codex-do" \
         HOME="$_self_home" \

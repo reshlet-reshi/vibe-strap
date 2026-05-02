@@ -16,6 +16,9 @@ shift
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 
 case "$command_name" in
+    install-vscode-workspace)
+        exec sh "$script_dir/install-vscode-workspace.sh" "$@"
+        ;;
     query-vscode-unpersisted-documents)
         exec sh "$script_dir/query-vscode-unpersisted-documents.sh" "$@"
         ;;

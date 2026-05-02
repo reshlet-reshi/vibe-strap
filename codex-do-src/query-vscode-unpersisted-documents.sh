@@ -18,6 +18,6 @@ if body=$(wget -T 2 -t 1 -qO- "$url" 2> /dev/null); then
 else
     printf '%s: VS Code REST API endpoint is not reachable: %s\n' "$0" "$url" >&2
     printf '%s: install/enable VS Code extension mkloubert.vs-rest-api, open this workspace, and reload VS Code\n' "$0" >&2
-    printf '%s: then retry or run: sh codex-do-src/bootstrap.sh --check\n' "$0" >&2
+    printf '%s: then retry or run: sh codex-do-src/install-vscode-workspace.sh && sh codex-do-src/bootstrap.sh --check\n' "$0" >&2
     exit 1
 fi

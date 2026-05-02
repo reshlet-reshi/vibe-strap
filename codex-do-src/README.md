@@ -46,6 +46,18 @@ The bootstrap script copies this directory to `~/codex-do`, checks the local
 tools used by the dispatcher, checks the workspace VS Code REST API settings,
 and prints the Codex approval rule for the released dispatcher.
 
+To install or repair the VS Code workspace files directly:
+
+```sh
+sh codex-do-src/install-vscode-workspace.sh
+```
+
+The released dispatcher can do the same for any workspace:
+
+```sh
+sh ~/codex-do/codex-do.sh install-vscode-workspace --workspace /path/to/project
+```
+
 If VS Code is not answering yet, install/enable the recommended extension
 `mkloubert.vs-rest-api`, open this workspace, reload VS Code, then run:
 
