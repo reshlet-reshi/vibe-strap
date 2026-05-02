@@ -3,6 +3,12 @@ set -eu
 
 target_dir="$HOME/codex-do"
 source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+project_dir=$(git -C "$source_dir" rev-parse --show-toplevel 2> /dev/null) || {
+    printf '%s: source directory is not inside a git repo: %s\n' "$0" "$source_dir" >&2
+    exit 1
+}
+project_dir=$(CDPATH= cd -- "$project_dir" && pwd -P)
+source_rel=${source_dir#"$project_dir"/}
 commit_requested=false
 commit_message=
 push_requested=false
@@ -41,6 +47,46 @@ while test "$#" -gt 0; do
     esac
     shift
 done
+
+if test "$commit_requested" = false && test "$push_requested" = false; then
+    printf '%s: pass --commit MESSAGE, --push, or both\n' "$0" >&2
+    exit 2
+fi
+
+if test "$source_rel" = "$source_dir"; then
+    printf '%s: source directory is not inside project directory: %s\n' \
+        "$0" "$source_dir" >&2
+    exit 1
+fi
+
+if test "$(basename -- "$source_dir")" != codex-do-src; then
+    printf '%s: source directory basename is not codex-do-src: %s\n' \
+        "$0" "$source_dir" >&2
+    exit 1
+fi
+
+bad_project_path=$(
+    {
+        git -C "$project_dir" diff --name-only
+        git -C "$project_dir" diff --cached --name-only
+        git -C "$project_dir" ls-files --others --exclude-standard
+    } | sort -u | while IFS= read -r path; do
+        case "$path" in
+            "$source_rel"/*)
+                ;;
+            *)
+                printf '%s\n' "$path"
+                break
+                ;;
+        esac
+    done
+)
+
+if test -n "$bad_project_path"; then
+    printf '%s: refusing to release with project changes outside %s: %s\n' \
+        "$0" "$source_rel" "$bad_project_path" >&2
+    exit 1
+fi
 
 if ! test -e "$target_dir"; then
     printf '%s: target directory does not exist: %s\n' "$0" "$target_dir" >&2
@@ -95,6 +141,12 @@ find "$source_dir" -mindepth 1 -maxdepth 1 ! -name .git \
 
 printf 'released codex-do scripts to %s\n' "$target_dir"
 
+printf '\nproject git status:\n'
+git -C "$project_dir" status --short --branch
+
+printf '\nproject git diff stat:\n'
+git -C "$project_dir" diff --stat
+
 printf '\ntarget git status:\n'
 git -C "$target_dir" status --short --branch
 
@@ -102,18 +154,50 @@ printf '\ntarget git diff stat:\n'
 git -C "$target_dir" diff --stat
 
 if test "$commit_requested" = true; then
+    committed=false
+
+    git -C "$project_dir" add -A -- "$source_rel"
+    if git -C "$project_dir" diff --cached --quiet -- "$source_rel"; then
+        printf '\nno project changes to commit\n'
+    else
+        git -C "$project_dir" commit -m "$commit_message"
+        committed=true
+    fi
+
+    printf '\nproject git status after commit:\n'
+    git -C "$project_dir" status --short --branch
+
     git -C "$target_dir" add -A
     if git -C "$target_dir" diff --cached --quiet; then
         printf '\nno target changes to commit\n'
     else
         git -C "$target_dir" commit -m "$commit_message"
+        committed=true
     fi
 
     printf '\ntarget git status after commit:\n'
     git -C "$target_dir" status --short --branch
+
+    if test "$committed" = false; then
+        printf '%s: --commit requested but there was nothing to commit\n' "$0" >&2
+        exit 1
+    fi
 fi
 
 if test "$push_requested" = true; then
+    if ! git -C "$project_dir" diff --quiet; then
+        printf '%s: refusing to push with unstaged project changes\n' "$0" >&2
+        exit 1
+    fi
+    if ! git -C "$project_dir" diff --cached --quiet; then
+        printf '%s: refusing to push with staged project changes\n' "$0" >&2
+        exit 1
+    fi
+    if test -n "$(git -C "$project_dir" status --short --untracked-files=all)"; then
+        printf '%s: refusing to push with untracked project files\n' "$0" >&2
+        exit 1
+    fi
+
     if ! git -C "$target_dir" diff --quiet; then
         printf '%s: refusing to push with unstaged target changes\n' "$0" >&2
         exit 1
@@ -126,5 +210,6 @@ if test "$push_requested" = true; then
         printf '%s: refusing to push with untracked target files\n' "$0" >&2
         exit 1
     fi
+    git -C "$project_dir" push
     git -C "$target_dir" push
 fi
